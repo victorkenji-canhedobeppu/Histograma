@@ -1,23 +1,25 @@
-# -*- coding: utf-8 -*-
+# src/main.py
+# Este é o ponto de entrada principal da aplicação.
+# Sua única responsabilidade é instanciar e iniciar a interface do usuário.
 
-import sys
-import os
-
-# Adiciona o diretório 'src' ao path do Python para encontrar os módulos.
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
-
-# Importa a classe principal da aplicação do módulo 'app'
 from ui.app import App
+import customtkinter as ctk
+
+
+def main():
+    """
+    Função principal que inicializa e executa a aplicação.
+    """
+    # Define o tema da aplicação
+    ctk.set_appearance_mode("System")  # Pode ser "System", "Dark", "Light"
+    ctk.set_default_color_theme("blue")  # Tema de cor padrão
+
+    # Cria a instância da janela principal
+    app = App()
+
+    # Inicia o loop de eventos da interface gráfica
+    app.mainloop()
+
 
 if __name__ == "__main__":
-    """
-    Ponto de entrada principal da aplicação.
-
-    Este script instancia a classe App e chama o método run() para iniciar.
-    Para executar, navegue até a raiz do projeto no terminal e rode: python main.py
-    """
-    # Cria uma instância da aplicação
-    application = App()
-
-    # Inicia a execução
-    application.run()
+    main()
