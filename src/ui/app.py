@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from config.settings import DISCIPLINAS
 from core.project import Portfolio
 from .gui_app import GuiApp
 
@@ -10,27 +11,9 @@ class App:
     """
 
     def __init__(self):
-        self.disciplinas = [
-            "Geometria",
-            "Terraplenagem",
-            "Drenagem",
-            "Pavimento",
-            "Sinalização",
-            "Geologia",
-            "Geotecnia",
-            "Estruturas",
-            "Coordenação",
-        ]
-        self.cargos_disponiveis = [
-            "Projetista",
-            "Eng. Civil",
-            "Eng. Pleno",
-            "Eng. Sênior",
-            "Coordenador",
-        ]
 
         self.funcionarios = []
-        self.portfolio = Portfolio(self.disciplinas)
+        self.portfolio = Portfolio(DISCIPLINAS)
         self.ui = GuiApp(app_controller=self)
 
     def run(self):
@@ -72,9 +55,22 @@ class App:
         self.portfolio.definir_configuracoes_gerais(horas_mes, self.funcionarios)
         self.portfolio.definir_dados_lotes(lotes_data)
 
-        # Gera os dois relatórios
-        df_dashboard = self.portfolio.gerar_relatorio_alocacao_decimal()
+        # 1. Gerar o dashboard consolidado
+        df_dashboard_consolidado = self.portfolio.gerar_relatorio_alocacao_decimal()
+
+        # 2. Gerar o detalhamento de horas por tarefa
         detalhes_tarefas = self.portfolio.gerar_relatorio_detalhado_por_tarefa()
 
-        # Passa ambos para a UI
-        self.ui.atualizar_dashboard(df_dashboard, detalhes_tarefas)
+        # 3. Gerar um dashboard para cada lote
+        dashboards_lotes = {}
+        for lote in lotes_data:
+            nome_lote = lote["nome"]
+            df_lote = self.portfolio.gerar_relatorio_alocacao_decimal(
+                nome_lote=nome_lote
+            )
+            dashboards_lotes[nome_lote] = df_lote
+
+        # 4. Passar tudo para a UI atualizar
+        self.ui.atualizar_dashboards(
+            df_dashboard_consolidado, dashboards_lotes, detalhes_tarefas
+        )

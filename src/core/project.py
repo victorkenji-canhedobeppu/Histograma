@@ -11,6 +11,7 @@ class Portfolio:
     de horas por pessoa e valida a capacidade dos recursos entre os projetos.
     """
 
+    # ... (o resto da classe __init__, definir_configuracoes_gerais, etc. permanece igual) ...
     def __init__(self, disciplinas):
         self.disciplinas = disciplinas
         self.lotes_data = []
@@ -29,18 +30,21 @@ class Portfolio:
         """
         self.lotes_data = lotes_data
 
-    def _get_date_range(self):
-        """Helper para obter o intervalo de datas de todo o portfólio."""
+    def _get_date_range(self, lotes_filtrados=None):
+        """Helper para obter o intervalo de datas do portfólio ou de lotes específicos."""
+        lotes_a_verificar = (
+            lotes_filtrados if lotes_filtrados is not None else self.lotes_data
+        )
         try:
             datas_inicio = [
                 datetime.strptime(lote["cronograma"][disc]["inicio"], "%d/%m/%Y")
-                for lote in self.lotes_data
+                for lote in lotes_a_verificar
                 for disc in self.disciplinas
                 if lote.get("cronograma", {}).get(disc, {}).get("inicio")
             ]
             datas_fim = [
                 datetime.strptime(lote["cronograma"][disc]["fim"], "%d/%m/%Y")
-                for lote in self.lotes_data
+                for lote in lotes_a_verificar
                 for disc in self.disciplinas
                 if lote.get("cronograma", {}).get(disc, {}).get("fim")
             ]
@@ -50,24 +54,31 @@ class Portfolio:
         except ValueError:
             raise ValueError("Formato de data inválido. Use DD/MM/AAAA.")
 
-    def gerar_relatorio_alocacao_decimal(self):
+    def gerar_relatorio_alocacao_decimal(self, nome_lote=None):
         """
         Gera um relatório com a alocação decimal de cada pessoa, por mês,
-        conforme a nova fórmula de cálculo.
+        detalhado por disciplina.
         """
         if not self.lotes_data or not self.funcionarios:
             return pd.DataFrame()
 
-        try:
-            data_inicio_portfolio, data_final_portfolio = self._get_date_range()
-            if not data_inicio_portfolio:
+        lotes_a_processar = self.lotes_data
+        if nome_lote:
+            lotes_a_processar = [
+                lote for lote in self.lotes_data if lote["nome"] == nome_lote
+            ]
+            if not lotes_a_processar:
                 return pd.DataFrame()
+
+        try:
+            _, _ = self._get_date_range(lotes_a_processar)
         except ValueError as e:
             return pd.DataFrame([{"Erro": str(e)}])
 
-        decimal_consolidado = {pessoa: {} for pessoa in self.funcionarios}
+        # A chave agora é (pessoa_tuplo, disciplina)
+        decimal_por_disciplina = {}
 
-        for lote in self.lotes_data:
+        for lote in lotes_a_processar:
             for disc in self.disciplinas:
                 for alocacao in lote.get("alocacao", {}).get(disc, []):
                     try:
@@ -80,6 +91,9 @@ class Portfolio:
                         horas_trabalhadas_tarefa = alocacao["horas_totais"]
                         pessoa_tuplo = alocacao["funcionario"]
 
+                        # Define a chave de agregação
+                        chave_alocacao = (pessoa_tuplo, disc)
+
                         num_meses = (
                             (fim_tarefa.year - inicio_tarefa.year) * 12
                             + (fim_tarefa.month - inicio_tarefa.month)
@@ -87,9 +101,9 @@ class Portfolio:
                         )
                         if num_meses <= 0:
                             continue
-
                         if self.horas_trabalhaveis_mes == 0:
                             continue
+
                         decimal_mensal = (
                             horas_trabalhadas_tarefa / self.horas_trabalhaveis_mes
                         ) / num_meses
@@ -97,9 +111,19 @@ class Portfolio:
                         data_corrente = inicio_tarefa.replace(day=1)
                         while data_corrente <= fim_tarefa:
                             mes_ano_key = data_corrente.strftime("%Y-%m")
-                            if mes_ano_key not in decimal_consolidado[pessoa_tuplo]:
-                                decimal_consolidado[pessoa_tuplo][mes_ano_key] = 0.0
-                            decimal_consolidado[pessoa_tuplo][
+
+                            # Inicializa o dicionário para a chave se não existir
+                            if chave_alocacao not in decimal_por_disciplina:
+                                decimal_por_disciplina[chave_alocacao] = {}
+                            if (
+                                mes_ano_key
+                                not in decimal_por_disciplina[chave_alocacao]
+                            ):
+                                decimal_por_disciplina[chave_alocacao][
+                                    mes_ano_key
+                                ] = 0.0
+
+                            decimal_por_disciplina[chave_alocacao][
                                 mes_ano_key
                             ] += decimal_mensal
                             data_corrente += relativedelta(months=1)
@@ -110,7 +134,7 @@ class Portfolio:
             list(
                 set(
                     mes
-                    for pessoa_meses in decimal_consolidado.values()
+                    for pessoa_meses in decimal_por_disciplina.values()
                     for mes in pessoa_meses.keys()
                 )
             )
@@ -120,11 +144,18 @@ class Portfolio:
         ]
 
         relatorio_final = []
-        for pessoa_tuplo, meses_data in decimal_consolidado.items():
+        for chave_alocacao, meses_data in decimal_por_disciplina.items():
             if not any(meses_data.values()):
                 continue
 
-            linha_relatorio = {"Funcionário": pessoa_tuplo[0], "Cargo": pessoa_tuplo[1]}
+            pessoa_tuplo, disciplina = chave_alocacao
+            nome_funcionario, cargo_funcionario = pessoa_tuplo
+
+            linha_relatorio = {
+                "Funcionário": nome_funcionario,
+                "Cargo": cargo_funcionario,
+                "Disciplina": disciplina,
+            }
             status = "OK"
             total_decimal = 0
 
@@ -141,8 +172,17 @@ class Portfolio:
             linha_relatorio["Status"] = status
             relatorio_final.append(linha_relatorio)
 
-        colunas = ["Funcionário", "Cargo"] + meses_display + ["Total Decimal", "Status"]
+        # Adiciona a nova coluna 'Disciplina'
+        colunas = (
+            ["Funcionário", "Cargo", "Disciplina"]
+            + meses_display
+            + ["Total Decimal", "Status"]
+        )
         df_relatorio = pd.DataFrame(relatorio_final)
+
+        # Se não houver dados, retorna um DF vazio com as colunas certas
+        if df_relatorio.empty:
+            return pd.DataFrame(columns=colunas)
 
         return df_relatorio.reindex(columns=colunas, fill_value="0,00")
 
@@ -152,6 +192,7 @@ class Portfolio:
         Retorna um dicionário para fácil consulta pela UI.
         Ex: {('1', 'Geometria', ('Nome', 'Cargo')): {'Jan/25': 40.0, 'Fev/25': 40.0}}
         """
+        # (Nenhuma alteração neste método)
         detalhes_tarefas = {}
         if not self.lotes_data:
             return detalhes_tarefas
