@@ -20,6 +20,53 @@ class Portfolio:
     def definir_dados_lotes(self, lotes_data):
         self.lotes_data = lotes_data
 
+    # NOVO: Método para gerar o relatório de horas por funcionário e disciplina.
+    def gerar_relatorio_horas_por_funcionario(self):
+        """
+        Agrega as horas totais de cada funcionário por disciplina em todos os lotes.
+        """
+        if not self.lotes_data:
+            return pd.DataFrame()
+
+        # Dicionário para armazenar: (nome, cargo, disciplina) -> total_horas
+        horas_agregadas = defaultdict(float)
+
+        # Itera sobre todos os lotes e alocações para somar as horas
+        for lote in self.lotes_data:
+            for disciplina_nome, dados_disc in lote.get("disciplinas", {}).items():
+                for alocacao in dados_disc.get("alocacoes", []):
+                    try:
+                        nome_func, cargo_func = alocacao["funcionario"]
+                        horas = alocacao.get("horas_totais", 0)
+
+                        # A chave de agregação inclui o nome, cargo e a disciplina da alocação
+                        chave = (nome_func, cargo_func, disciplina_nome)
+                        horas_agregadas[chave] += horas
+                    except (KeyError, ValueError):
+                        continue
+
+        if not horas_agregadas:
+            return pd.DataFrame()
+
+        # Converte o dicionário para uma lista de dicionários para criar o DataFrame
+        lista_relatorio = []
+        for (nome, cargo, disciplina), horas in horas_agregadas.items():
+            lista_relatorio.append(
+                {
+                    "Funcionário": nome,
+                    "Cargo": cargo,
+                    "Disciplina": disciplina,
+                    "Horas Totais Alocadas": horas,
+                }
+            )
+
+        df = pd.DataFrame(lista_relatorio)
+
+        # Ordena o DataFrame para melhor visualização
+        df_sorted = df.sort_values(by=["Funcionário", "Disciplina"])
+
+        return df_sorted
+
     def _processar_alocacao(self, inicio_str, fim_str, horas):
         if not inicio_str or not fim_str or not horas > 0:
             return None
@@ -165,12 +212,7 @@ class Portfolio:
     def gerar_relatorio_detalhado_por_tarefa(self):
         return {}
 
-    # MODIFICADO: Retorna a porcentagem global e um dicionário com os detalhes por lote.
     def verificar_porcentagem_horas_cargo(self, cargo_alvo):
-        """
-        Calcula a porcentagem das horas de um cargo no total e detalha por lote.
-        Retorna: (porcentagem_global, {lote_nome: porcentagem_lote, ...})
-        """
         if not self.lotes_data:
             return 0.0, {}
 
@@ -183,7 +225,6 @@ class Portfolio:
             horas_cargo_alvo_lote = 0.0
             horas_totais_lote = 0.0
 
-            # Soma horas das disciplinas (equipe)
             for disc, dados_disc in lote.get("disciplinas", {}).items():
                 for alocacao in dados_disc.get("alocacoes", []):
                     try:
@@ -196,7 +237,6 @@ class Portfolio:
                     except (KeyError, ValueError):
                         continue
 
-            # Soma horas dos subcontratos
             for sub_aloc in lote.get("subcontratos", []):
                 try:
                     horas = sub_aloc.get("horas_totais", 0)
@@ -204,18 +244,15 @@ class Portfolio:
                 except (KeyError, ValueError):
                     continue
 
-            # Calcula porcentagem para este lote e armazena
             if horas_totais_lote > 0:
                 percent_lote = (horas_cargo_alvo_lote / horas_totais_lote) * 100
                 detalhes_por_lote[nome_lote] = percent_lote
             else:
                 detalhes_por_lote[nome_lote] = 0.0
 
-            # Acumula totais globais
             horas_cargo_alvo_global += horas_cargo_alvo_lote
             horas_totais_projeto_global += horas_totais_lote
 
-        # Calcula porcentagem global final
         if horas_totais_projeto_global == 0:
             porcentagem_global = 0.0
         else:

@@ -3,11 +3,14 @@
 import pandas as pd
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.chart import BarChart, Reference, Series
 from openpyxl.chart.layout import Layout, ManualLayout
 from openpyxl.chart.label import DataLabelList
 import datetime
+import openpyxl
 from functools import partial
 import json
 import os
@@ -207,9 +210,8 @@ class GuiApp(tk.Tk):
         # Frame da Equipe
         team_frame = ttk.LabelFrame(parent, text="Equipe", padding=10)
         team_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 5))
-        team_frame.columnconfigure(0, weight=1)  # Permite que o botão se expanda
+        team_frame.columnconfigure(0, weight=1)
 
-        # Botão de Gerenciar Equipe dentro do novo frame
         ttk.Button(
             team_frame, text="Gerenciar Equipe", command=self.open_team_manager
         ).grid(row=0, column=0, sticky="ew", ipady=4)
@@ -238,7 +240,6 @@ class GuiApp(tk.Tk):
         action_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
         action_frame.columnconfigure(0, weight=1)
 
-        # Botão "Calcular Alocação"
         ttk.Button(
             action_frame,
             text="Calcular Alocação",
@@ -246,13 +247,253 @@ class GuiApp(tk.Tk):
             style="Accent.TButton",
         ).grid(row=0, column=0, sticky="ew", ipady=6, pady=2)
 
-        # Botão "Exportar para Excel"
         ttk.Button(
             action_frame,
-            text="Exportar para Excel",
+            text="Exportar Relatório Detalhado",  # Nome atualizado para clareza
             command=self.exportar_para_excel,
             style="Accent.TButton",
         ).grid(row=1, column=0, sticky="ew", ipady=6, pady=2)
+
+        # NOVO: Botão para exportar o resumo da equipe
+        ttk.Button(
+            action_frame,
+            text="Exportar Resumo da Equipe",
+            command=self.exportar_resumo_equipe,  # Chama a nova função
+            style="Accent.TButton",
+        ).grid(row=2, column=0, sticky="ew", ipady=6, pady=2)
+
+    # NOVO: Função para exportar o resumo da equipe.
+    def exportar_resumo_equipe(self):
+        try:
+            df_resumo = self.app_controller.get_resumo_equipe_df()
+
+            if df_resumo.empty:
+                messagebox.showwarning(
+                    "Aviso",
+                    "Não há dados de alocação da equipe para exportar.",
+                    parent=self,
+                )
+                return
+
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Arquivo Excel", "*.xlsx"), ("Todos os Arquivos", "*.*")],
+                title="Salvar Resumo da Equipe",
+                initialfile=f"Resumo_Equipe_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx",
+            )
+            if not filepath:
+                return
+
+            with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+                cargos = self.app_controller.get_cargos_disponiveis()
+                self._write_styled_resumo_to_excel(
+                    writer, "Resumo por Funcionário", df_resumo, cargos
+                )
+
+                # Remove a planilha padrão APENAS DEPOIS de criar a nova
+                if "Sheet" in writer.book.sheetnames:
+                    writer.book.remove(writer.book["Sheet"])
+
+            messagebox.showinfo(
+                "Sucesso",
+                f"Resumo da equipe exportado com sucesso para:\n{filepath}",
+                parent=self,
+            )
+
+        except Exception as e:
+            messagebox.showerror(
+                "Erro na Exportação",
+                f"Ocorreu um erro ao exportar o resumo da equipe:\n{e}",
+                parent=self,
+            )
+
+    # NOVO: Método para escrever o resumo da equipe com formatação avançada.
+    def _write_styled_resumo_to_excel(self, writer, sheet_name, df, cargos):
+        book = writer.book
+        ws = book.create_sheet(title=sheet_name)
+        writer.sheets[sheet_name] = ws
+        ws.sheet_view.showGridLines = False
+
+        # --- 1. TABELA DE PREÇOS ---
+        ws.cell(row=2, column=2, value="Tabela de Preços por Cargo").font = Font(
+            bold=True, size=14
+        )
+        ws.cell(row=3, column=2, value="Cargo").font = Font(bold=True)
+        ws.cell(row=3, column=3, value="Preço/Hora (R$)").font = Font(bold=True)
+
+        input_style = NamedStyle(name="input_style_resumo")
+        input_style.fill = PatternFill(
+            start_color="FFFFCC", end_color="FFFFCC", fill_type="solid"
+        )
+        input_style.number_format = '"R$" #,##0.00'
+        if input_style.name not in book.style_names:
+            book.add_named_style(input_style)
+
+        start_row_price_table = 4
+        for i, cargo_nome in enumerate(cargos, start=start_row_price_table):
+            ws.cell(row=i, column=2, value=cargo_nome)
+            price_cell = ws.cell(row=i, column=3)
+            price_cell.style = input_style
+
+        end_row_price_table = start_row_price_table + len(cargos) - 1
+        price_table_range_str = f"'{sheet_name}'!${openpyxl.utils.get_column_letter(2)}${start_row_price_table}:${openpyxl.utils.get_column_letter(3)}${end_row_price_table}"
+
+        # CORRIGIDO: Esta é a forma correta de adicionar o Defined Name.
+        named_range = openpyxl.workbook.defined_name.DefinedName(
+            "TabelaPrecos", attr_text=price_table_range_str
+        )
+
+        # CORRECTED FIX: Assign the named range like a dictionary entry
+        book.defined_names["TabelaPrecos"] = named_range
+
+        # --- 2. TABELA PRINCIPAL DE DADOS ---
+        df_sorted = df.sort_values(by=["Disciplina", "Funcionário"])
+        start_row_main_table = end_row_price_table + 3
+
+        headers = [
+            "Funcionário",
+            "Cargo",
+            "Disciplina",
+            "Horas Totais Alocadas",
+            "Valor Total (R$)",
+        ]
+        for c_idx, header_text in enumerate(headers, 1):
+            cell = ws.cell(row=start_row_main_table, column=c_idx, value=header_text)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(
+                start_color="44546A", end_color="44546A", fill_type="solid"
+            )
+
+        rows = dataframe_to_rows(df_sorted, index=False, header=False)
+        current_row_excel = start_row_main_table + 1
+        last_discipline = None
+
+        for row_data_tuple in rows:
+            disciplina_atual = row_data_tuple[2]
+            if disciplina_atual != last_discipline:
+                cat_cell = ws.cell(
+                    row=current_row_excel, column=1, value=disciplina_atual
+                )
+                cat_cell.font = Font(bold=True, size=12)
+                cat_cell.fill = PatternFill(
+                    start_color="DDEBF7", end_color="DDEBF7", fill_type="solid"
+                )
+                ws.merge_cells(
+                    start_row=current_row_excel,
+                    start_column=1,
+                    end_row=current_row_excel,
+                    end_column=len(headers),
+                )
+                last_discipline = disciplina_atual
+                current_row_excel += 1
+
+            for c_idx, value in enumerate(row_data_tuple, 1):
+                ws.cell(row=current_row_excel, column=c_idx, value=value)
+
+            cargo_cell_coord = (
+                f"{openpyxl.utils.get_column_letter(2)}{current_row_excel}"
+            )
+            horas_cell_coord = (
+                f"{openpyxl.utils.get_column_letter(4)}{current_row_excel}"
+            )
+            formula = f'=IFERROR(VLOOKUP({cargo_cell_coord},TabelaPrecos,2,FALSE)*{horas_cell_coord},"-")'
+
+            valor_cell = ws.cell(row=current_row_excel, column=5, value=formula)
+            valor_cell.number_format = '"R$" #,##0.00'
+            current_row_excel += 1
+        end_row_main_table = current_row_excel - 1
+
+        # --- 3. SEÇÃO DE TOTAIS E RESUMO FINANCEIRO ---
+        # Total Geral da tabela principal
+        total_geral_row = end_row_main_table + 1
+        valor_col_letter = openpyxl.utils.get_column_letter(5)
+        total_geral_label_cell = ws.cell(
+            row=total_geral_row, column=4, value="Total Geral"
+        )
+        total_geral_label_cell.font = Font(bold=True)
+        total_geral_label_cell.alignment = Alignment(horizontal="right")
+
+        total_geral_valor_cell = ws.cell(
+            row=total_geral_row,
+            column=5,
+            value=f"=SUM({valor_col_letter}{start_row_main_table+1}:{valor_col_letter}{end_row_main_table})",
+        )
+        total_geral_valor_cell.font = Font(bold=True)
+        total_geral_valor_cell.number_format = '"R$" #,##0.00'
+
+        # Tabela de Resumo Financeiro por Cargo
+        start_row_summary = total_geral_row + 3
+        ws.cell(
+            row=start_row_summary, column=2, value="Resumo Financeiro por Cargo"
+        ).font = Font(bold=True, size=14)
+        summary_headers = [
+            "Cargo",
+            "Total (R$)",
+            "Desconto/Acréscimo (R$)",
+            "Subtotal (R$)",
+        ]
+        for c_idx, text in enumerate(summary_headers, 2):
+            ws.cell(row=start_row_summary + 1, column=c_idx).font = Font(bold=True)
+            ws.cell(row=start_row_summary + 1, column=c_idx).value = text
+
+        # Preenche a tabela de resumo com fórmulas
+        cargo_col_main_table = openpyxl.utils.get_column_letter(2)
+        valor_col_main_table = openpyxl.utils.get_column_letter(5)
+        main_table_range = f"{cargo_col_main_table}{start_row_main_table+1}:{valor_col_main_table}{end_row_main_table}"
+
+        for i, cargo_nome in enumerate(cargos, start=start_row_summary + 2):
+            # Coluna Cargo
+            ws.cell(row=i, column=2, value=cargo_nome)
+
+            # Coluna Total (R$) com fórmula SOMASE
+            cargo_criteria_cell = ws.cell(row=i, column=2).coordinate
+            formula_sumif = f"=SUMIF({cargo_col_main_table}${start_row_main_table+1}:{cargo_col_main_table}${end_row_main_table}, {cargo_criteria_cell}, {valor_col_main_table}${start_row_main_table+1}:{valor_col_main_table}${end_row_main_table})"
+            total_cell = ws.cell(row=i, column=3, value=formula_sumif)
+            total_cell.number_format = '"R$" #,##0.00'
+
+            # Coluna Desconto/Acréscimo (R$) para input do usuário
+            desconto_cell = ws.cell(row=i, column=4)
+            desconto_cell.style = input_style  # Reusa o estilo amarelo
+
+            # Coluna Subtotal (R$) com fórmula de subtração
+            formula_subtotal = f"={ws.cell(row=i, column=3).coordinate}-{ws.cell(row=i, column=4).coordinate}"
+            subtotal_cell = ws.cell(row=i, column=5, value=formula_subtotal)
+            subtotal_cell.number_format = '"R$" #,##0.00'
+
+        # Total Final do Resumo
+        end_row_summary = start_row_summary + 1 + len(cargos)
+        total_final_label = ws.cell(row=end_row_summary, column=4, value="Total Final")
+        total_final_label.font = Font(bold=True, size=12)
+        total_final_label.alignment = Alignment(horizontal="right")
+
+        subtotal_col_letter = openpyxl.utils.get_column_letter(5)
+        total_final_valor = ws.cell(
+            row=end_row_summary,
+            column=5,
+            value=f"=SUM({subtotal_col_letter}{start_row_summary+2}:{subtotal_col_letter}{end_row_summary-1})",
+        )
+        total_final_valor.font = Font(bold=True, size=12)
+        total_final_valor.number_format = '"R$" #,##0.00'
+
+        # --- 4. FORMATAÇÃO FINAL ---
+        horas_col_letter = openpyxl.utils.get_column_letter(4)
+        color_scale_rule = ColorScaleRule(
+            start_type="min",
+            start_color="63BE7B",
+            mid_type="percentile",
+            mid_value=50,
+            mid_color="FFEB84",
+            end_type="max",
+            end_color="F8696B",
+        )
+        range_to_format = (
+            f"{horas_col_letter}{start_row_main_table+1}:{horas_col_letter}{ws.max_row}"
+        )
+        if ws.max_row > start_row_main_table:
+            ws.conditional_formatting.add(range_to_format, color_scale_rule)
+
+        for i in range(1, len(headers) + 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 25
 
     def open_team_manager(self):
         if self.team_window and self.team_window.winfo_exists():
@@ -986,23 +1227,21 @@ class GuiApp(tk.Tk):
 
         try:
             with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
-                # Remove a planilha padrão se ela existir
-                if "Sheet" in writer.book.sheetnames:
-                    writer.book.remove(writer.book["Sheet"])
-
-                # Escreve a planilha consolidada e cria o gráfico para ela
+                # 1. Escreve a planilha consolidada e cria o gráfico para ela
                 self._write_styled_df_to_excel(writer, "Consolidado", df_consolidado)
-                self._create_chart_for_sheet(
-                    writer, "Consolidado", df_consolidado
-                )  # <-- ADICIONADO AQUI
+                self._create_chart_for_sheet(writer, "Consolidado", df_consolidado)
 
-                # Escreve as planilhas de lote e seus gráficos
+                # 2. Escreve as planilhas de lote e seus gráficos
                 if dashboards_lotes:
                     for nome_lote, df_lote in dashboards_lotes.items():
                         if not df_lote.empty:
                             sheet_name = f"Lote {nome_lote}"
                             self._write_styled_df_to_excel(writer, sheet_name, df_lote)
                             self._create_chart_for_sheet(writer, sheet_name, df_lote)
+
+                # 3. Remove a planilha padrão APENAS DEPOIS de criar as novas
+                if "Sheet" in writer.book.sheetnames:
+                    writer.book.remove(writer.book["Sheet"])
 
             messagebox.showinfo(
                 "Sucesso", f"Relatório exportado com sucesso para:\n{filepath}"

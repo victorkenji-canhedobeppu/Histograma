@@ -13,6 +13,13 @@ class App:
         self.ultimo_df_consolidado = None
         self.ultimo_dashboards_lotes = None
 
+    # NOVO: Método para obter o DataFrame do resumo da equipe.
+    def get_resumo_equipe_df(self):
+        # Garante que os dados mais recentes da UI estão no portfólio
+        lotes_data = self.ui._coletar_dados_da_ui()["lotes"]
+        self.portfolio.definir_dados_lotes(lotes_data)
+        return self.portfolio.gerar_relatorio_horas_por_funcionario()
+
     def run(self):
         self.ui.carregar_estado()
         self.ui.mainloop()
@@ -70,7 +77,6 @@ class App:
                 f"Erro ao tentar remover: formato de string inválido '{display_string}'"
             )
 
-    # MODIFICADO: Desempacota os resultados e passa para a UI.
     def processar_portfolio(self, lotes_data, horas_mes):
         self.portfolio.definir_configuracoes_gerais(horas_mes, self.funcionarios)
         self.portfolio.definir_dados_lotes(lotes_data)
@@ -86,12 +92,10 @@ class App:
             )
             self.ultimo_dashboards_lotes[nome_lote] = df_lote
 
-        # A verificação agora retorna uma tupla (global, detalhes_por_lote)
         porcentagem_global, detalhes_lotes = (
             self.portfolio.verificar_porcentagem_horas_cargo(cargo_alvo=CARGOS["ESTAG"])
         )
 
-        # Monta um dicionário para passar para a UI
         alerta_composicao = {"global": porcentagem_global, "lotes": detalhes_lotes}
 
         self.ui.atualizar_dashboards(
