@@ -55,7 +55,20 @@ class Portfolio:
                 for alocacao in dados_disc.get("alocacoes", []):
                     try:
                         pessoa_tuplo = alocacao["funcionario"]
-                        chave_agregacao = (disc, pessoa_tuplo[1], pessoa_tuplo[0])
+                        func_completo = next(
+                            (
+                                f
+                                for f in self.funcionarios
+                                if f[0] == pessoa_tuplo[0] and f[1] == pessoa_tuplo[1]
+                            ),
+                            None,
+                        )
+                        if not func_completo:
+                            continue
+
+                        cargo = func_completo[1]
+                        chave_agregacao = (disc, cargo, pessoa_tuplo[0])
+
                         decimais = self._processar_alocacao(
                             cronograma.get("inicio"),
                             cronograma.get("fim"),
@@ -64,7 +77,7 @@ class Portfolio:
                         if decimais:
                             for mes, valor in decimais.items():
                                 decimal_bruto_geral[chave_agregacao][mes] += valor
-                    except (ValueError, KeyError, ZeroDivisionError):
+                    except (ValueError, KeyError, ZeroDivisionError, StopIteration):
                         continue
 
             for sub_aloc in lote.get("subcontratos", []):
@@ -151,3 +164,63 @@ class Portfolio:
 
     def gerar_relatorio_detalhado_por_tarefa(self):
         return {}
+
+    # MODIFICADO: Retorna a porcentagem global e um dicionário com os detalhes por lote.
+    def verificar_porcentagem_horas_cargo(self, cargo_alvo):
+        """
+        Calcula a porcentagem das horas de um cargo no total e detalha por lote.
+        Retorna: (porcentagem_global, {lote_nome: porcentagem_lote, ...})
+        """
+        if not self.lotes_data:
+            return 0.0, {}
+
+        horas_cargo_alvo_global = 0.0
+        horas_totais_projeto_global = 0.0
+        detalhes_por_lote = {}
+
+        for lote in self.lotes_data:
+            nome_lote = lote.get("nome", "Desconhecido")
+            horas_cargo_alvo_lote = 0.0
+            horas_totais_lote = 0.0
+
+            # Soma horas das disciplinas (equipe)
+            for disc, dados_disc in lote.get("disciplinas", {}).items():
+                for alocacao in dados_disc.get("alocacoes", []):
+                    try:
+                        horas = alocacao.get("horas_totais", 0)
+                        horas_totais_lote += horas
+
+                        _, cargo_func = alocacao["funcionario"]
+                        if cargo_func == cargo_alvo:
+                            horas_cargo_alvo_lote += horas
+                    except (KeyError, ValueError):
+                        continue
+
+            # Soma horas dos subcontratos
+            for sub_aloc in lote.get("subcontratos", []):
+                try:
+                    horas = sub_aloc.get("horas_totais", 0)
+                    horas_totais_lote += horas
+                except (KeyError, ValueError):
+                    continue
+
+            # Calcula porcentagem para este lote e armazena
+            if horas_totais_lote > 0:
+                percent_lote = (horas_cargo_alvo_lote / horas_totais_lote) * 100
+                detalhes_por_lote[nome_lote] = percent_lote
+            else:
+                detalhes_por_lote[nome_lote] = 0.0
+
+            # Acumula totais globais
+            horas_cargo_alvo_global += horas_cargo_alvo_lote
+            horas_totais_projeto_global += horas_totais_lote
+
+        # Calcula porcentagem global final
+        if horas_totais_projeto_global == 0:
+            porcentagem_global = 0.0
+        else:
+            porcentagem_global = (
+                horas_cargo_alvo_global / horas_totais_projeto_global
+            ) * 100
+
+        return porcentagem_global, detalhes_por_lote

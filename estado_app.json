@@ -5,28 +5,29 @@
     },
     "funcionarios": [
         [
-            "1",
-            "Estagiário/Projetista"
+            "teste1",
+            "Estagiário/Projetista",
+            "Drenagem"
         ],
         [
-            "2",
-            "Estagiário/Projetista"
+            "teste3",
+            "Eng. Júnior",
+            "Drenagem"
         ],
         [
-            "3",
-            "Estagiário/Projetista"
+            "teste5",
+            "Estagiário/Projetista",
+            "Coordenação"
         ],
         [
-            "4",
-            "Eng. Sênior"
+            "teste7",
+            "Eng. Pleno",
+            "Estruturas"
         ],
         [
-            "5",
-            "Eng. Júnior"
-        ],
-        [
-            "6",
-            "Eng. Pleno"
+            "teste9",
+            "Estagiário/Projetista",
+            "Estruturas"
         ]
     ],
     "lotes": [
@@ -48,19 +49,19 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "1",
+                                "teste1",
                                 "Estagiário/Projetista"
                             ],
-                            "horas_totais": 120.0,
-                            "display_string": "1 (Estagiário/Projetista)"
+                            "horas_totais": 200.0,
+                            "display_string": "teste1 (Estagiário/Projetista)"
                         },
                         {
                             "funcionario": [
-                                "4",
-                                "Eng. Sênior"
+                                "teste3",
+                                "Eng. Júnior"
                             ],
-                            "horas_totais": 150.0,
-                            "display_string": "4 (Eng. Sênior)"
+                            "horas_totais": 110.0,
+                            "display_string": "teste3 (Eng. Júnior)"
                         }
                     ]
                 },
@@ -72,27 +73,19 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "2",
+                                "teste7",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 120.0,
+                            "display_string": "teste7 (Eng. Pleno)"
+                        },
+                        {
+                            "funcionario": [
+                                "teste9",
                                 "Estagiário/Projetista"
                             ],
                             "horas_totais": 120.0,
-                            "display_string": "2 (Estagiário/Projetista)"
-                        },
-                        {
-                            "funcionario": [
-                                "5",
-                                "Eng. Júnior"
-                            ],
-                            "horas_totais": 130.0,
-                            "display_string": "5 (Eng. Júnior)"
-                        },
-                        {
-                            "funcionario": [
-                                "6",
-                                "Eng. Pleno"
-                            ],
-                            "horas_totais": 140.0,
-                            "display_string": "6 (Eng. Pleno)"
+                            "display_string": "teste9 (Estagiário/Projetista)"
                         }
                     ]
                 },
@@ -153,57 +146,49 @@
                 },
                 "Drenagem": {
                     "cronograma": {
-                        "inicio": "01/01/2024",
-                        "fim": "01/02/2024"
+                        "inicio": "01/02/2024",
+                        "fim": "01/03/2024"
                     },
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "1",
+                                "teste1",
                                 "Estagiário/Projetista"
                             ],
                             "horas_totais": 120.0,
-                            "display_string": "1 (Estagiário/Projetista)"
+                            "display_string": "teste1 (Estagiário/Projetista)"
                         },
                         {
                             "funcionario": [
-                                "4",
-                                "Eng. Sênior"
+                                "teste3",
+                                "Eng. Júnior"
                             ],
-                            "horas_totais": 140.0,
-                            "display_string": "4 (Eng. Sênior)"
+                            "horas_totais": 500.0,
+                            "display_string": "teste3 (Eng. Júnior)"
                         }
                     ]
                 },
                 "Estruturas": {
                     "cronograma": {
-                        "inicio": "01/01/2024",
-                        "fim": "01/02/2024"
+                        "inicio": "01/02/2024",
+                        "fim": "01/03/2024"
                     },
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "2",
-                                "Estagiário/Projetista"
-                            ],
-                            "horas_totais": 120.0,
-                            "display_string": "2 (Estagiário/Projetista)"
-                        },
-                        {
-                            "funcionario": [
-                                "5",
-                                "Eng. Júnior"
-                            ],
-                            "horas_totais": 130.0,
-                            "display_string": "5 (Eng. Júnior)"
-                        },
-                        {
-                            "funcionario": [
-                                "6",
+                                "teste7",
                                 "Eng. Pleno"
                             ],
-                            "horas_totais": 140.0,
-                            "display_string": "6 (Eng. Pleno)"
+                            "horas_totais": 150.0,
+                            "display_string": "teste7 (Eng. Pleno)"
+                        },
+                        {
+                            "funcionario": [
+                                "teste9",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 123.0,
+                            "display_string": "teste9 (Estagiário/Projetista)"
                         }
                     ]
                 },
