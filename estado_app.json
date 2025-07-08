@@ -1,0 +1,256 @@
+{
+    "config": {
+        "horas_mes": 160,
+        "num_lotes": 2
+    },
+    "funcionarios": [
+        [
+            "1",
+            "Estagiário/Projetista"
+        ],
+        [
+            "2",
+            "Estagiário/Projetista"
+        ],
+        [
+            "3",
+            "Estagiário/Projetista"
+        ],
+        [
+            "4",
+            "Eng. Sênior"
+        ],
+        [
+            "5",
+            "Eng. Júnior"
+        ],
+        [
+            "6",
+            "Eng. Pleno"
+        ]
+    ],
+    "lotes": [
+        {
+            "nome": "1",
+            "disciplinas": {
+                "Coordenação": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Drenagem": {
+                    "cronograma": {
+                        "inicio": "01/01/2024",
+                        "fim": "01/02/2024"
+                    },
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "1",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 120.0,
+                            "display_string": "1 (Estagiário/Projetista)"
+                        },
+                        {
+                            "funcionario": [
+                                "4",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 150.0,
+                            "display_string": "4 (Eng. Sênior)"
+                        }
+                    ]
+                },
+                "Estruturas": {
+                    "cronograma": {
+                        "inicio": "01/01/2024",
+                        "fim": "01/02/2024"
+                    },
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "2",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 120.0,
+                            "display_string": "2 (Estagiário/Projetista)"
+                        },
+                        {
+                            "funcionario": [
+                                "5",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 130.0,
+                            "display_string": "5 (Eng. Júnior)"
+                        },
+                        {
+                            "funcionario": [
+                                "6",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 140.0,
+                            "display_string": "6 (Eng. Pleno)"
+                        }
+                    ]
+                },
+                "Geologia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geometria": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geotecnia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Pavimento": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Sinalização": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Terraplenagem": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                }
+            },
+            "subcontratos": []
+        },
+        {
+            "nome": "2",
+            "disciplinas": {
+                "Coordenação": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Drenagem": {
+                    "cronograma": {
+                        "inicio": "01/01/2024",
+                        "fim": "01/02/2024"
+                    },
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "1",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 120.0,
+                            "display_string": "1 (Estagiário/Projetista)"
+                        },
+                        {
+                            "funcionario": [
+                                "4",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 140.0,
+                            "display_string": "4 (Eng. Sênior)"
+                        }
+                    ]
+                },
+                "Estruturas": {
+                    "cronograma": {
+                        "inicio": "01/01/2024",
+                        "fim": "01/02/2024"
+                    },
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "2",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 120.0,
+                            "display_string": "2 (Estagiário/Projetista)"
+                        },
+                        {
+                            "funcionario": [
+                                "5",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 130.0,
+                            "display_string": "5 (Eng. Júnior)"
+                        },
+                        {
+                            "funcionario": [
+                                "6",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 140.0,
+                            "display_string": "6 (Eng. Pleno)"
+                        }
+                    ]
+                },
+                "Geologia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geometria": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geotecnia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Pavimento": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Sinalização": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Terraplenagem": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                }
+            },
+            "subcontratos": []
+        }
+    ]
+}

@@ -20,86 +20,99 @@ class Portfolio:
     def definir_dados_lotes(self, lotes_data):
         self.lotes_data = lotes_data
 
+    def _processar_alocacao(self, inicio_str, fim_str, horas):
+        if not inicio_str or not fim_str or not horas > 0:
+            return None
+        inicio = datetime.strptime(inicio_str, "%d/%m/%Y")
+        fim = datetime.strptime(fim_str, "%d/%m/%Y")
+        num_meses = (fim.year - inicio.year) * 12 + (fim.month - inicio.month) + 1
+        if num_meses <= 0 or self.horas_trabalhaveis_mes == 0:
+            return None
+        decimal_mensal = (horas / self.horas_trabalhaveis_mes) / num_meses
+        decimais = {}
+        data_corrente = inicio.replace(day=1)
+        while data_corrente <= fim:
+            mes_key = data_corrente.strftime("%Y-%m")
+            decimais[mes_key] = decimal_mensal
+            data_corrente += relativedelta(months=1)
+        return decimais
+
     def gerar_relatorio_alocacao_decimal(self, nome_lote=None):
-        if not self.lotes_data or not self.funcionarios:
+        if not self.lotes_data:
             return pd.DataFrame()
 
-        decimal_bruto_por_tarefa = defaultdict(lambda: defaultdict(float))
-        for lote in self.lotes_data:
-            for disc in self.disciplinas:
-                for alocacao in lote.get("alocacao", {}).get(disc, []):
-                    try:
-                        cronograma_disc = lote.get("cronograma", {}).get(disc, {})
-                        inicio_str = cronograma_disc.get("inicio")
-                        fim_str = cronograma_disc.get("fim")
-                        if not inicio_str or not fim_str:
-                            continue
+        decimal_bruto_geral = defaultdict(lambda: defaultdict(float))
 
-                        inicio_tarefa = datetime.strptime(inicio_str, "%d/%m/%Y")
-                        fim_tarefa = datetime.strptime(fim_str, "%d/%m/%Y")
-
-                        horas_trabalhadas = alocacao["horas_totais"]
-                        pessoa_tuplo = alocacao["funcionario"]
-                        chave_tarefa = (pessoa_tuplo, disc, lote["nome"])
-
-                        num_meses = (
-                            (fim_tarefa.year - inicio_tarefa.year) * 12
-                            + (fim_tarefa.month - inicio_tarefa.month)
-                            + 1
-                        )
-                        if num_meses <= 0 or self.horas_trabalhaveis_mes == 0:
-                            continue
-
-                        decimal_mensal = (
-                            horas_trabalhadas / self.horas_trabalhaveis_mes
-                        ) / num_meses
-
-                        data_corrente = inicio_tarefa.replace(day=1)
-                        while data_corrente <= fim_tarefa:
-                            mes_ano_key = data_corrente.strftime("%Y-%m")
-                            decimal_bruto_por_tarefa[chave_tarefa][
-                                mes_ano_key
-                            ] += decimal_mensal
-                            data_corrente += relativedelta(months=1)
-                    except (ValueError, ZeroDivisionError):
-                        continue
-
-        total_decimal_por_pessoa = defaultdict(lambda: defaultdict(float))
-        for (pessoa, _, _), meses_data in decimal_bruto_por_tarefa.items():
-            for mes, valor in meses_data.items():
-                total_decimal_por_pessoa[pessoa][mes] += valor
-
-        tarefas_a_processar = decimal_bruto_por_tarefa.items()
+        lotes_a_processar = self.lotes_data
         if nome_lote:
-            tarefas_a_processar = [
-                (chave, meses)
-                for (chave, meses) in decimal_bruto_por_tarefa.items()
-                if chave[2] == nome_lote
+            lotes_a_processar = [
+                lote for lote in self.lotes_data if lote["nome"] == nome_lote
             ]
 
-        decimal_agrupado = defaultdict(lambda: defaultdict(float))
-        for (pessoa, disc, _), meses_data in tarefas_a_processar:
-            for mes, valor in meses_data.items():
-                decimal_agrupado[(pessoa, disc)][mes] += valor
+        for lote in lotes_a_processar:
+            for disc, dados_disc in lote.get("disciplinas", {}).items():
+                cronograma = dados_disc.get("cronograma", {})
+                for alocacao in dados_disc.get("alocacoes", []):
+                    try:
+                        pessoa_tuplo = alocacao["funcionario"]
+                        chave_agregacao = (disc, pessoa_tuplo[1], pessoa_tuplo[0])
+                        decimais = self._processar_alocacao(
+                            cronograma.get("inicio"),
+                            cronograma.get("fim"),
+                            alocacao["horas_totais"],
+                        )
+                        if decimais:
+                            for mes, valor in decimais.items():
+                                decimal_bruto_geral[chave_agregacao][mes] += valor
+                    except (ValueError, KeyError, ZeroDivisionError):
+                        continue
+
+            for sub_aloc in lote.get("subcontratos", []):
+                try:
+                    nome_sub = sub_aloc["nome"]
+                    chave_agregacao = ("Subcontrato", nome_sub, "")
+                    decimais = self._processar_alocacao(
+                        sub_aloc.get("inicio"),
+                        sub_aloc.get("fim"),
+                        sub_aloc["horas_totais"],
+                    )
+                    if decimais:
+                        for mes, valor in decimais.items():
+                            decimal_bruto_geral[chave_agregacao][mes] += valor
+                except (ValueError, KeyError, ZeroDivisionError):
+                    continue
+
+        total_decimal_por_pessoa = defaultdict(lambda: defaultdict(float))
+        for (disc, cargo, nome), meses in decimal_bruto_geral.items():
+            if nome:
+                for mes, valor in meses.items():
+                    total_decimal_por_pessoa[(nome, cargo)][mes] += valor
 
         todos_meses_keys = sorted(
             list(
-                set(mes for meses in decimal_agrupado.values() for mes in meses.keys())
+                set(
+                    mes
+                    for meses in decimal_bruto_geral.values()
+                    for mes in meses.keys()
+                )
             )
         )
 
         relatorio_final = []
-        for (pessoa, disc), meses_data in decimal_agrupado.items():
-            linha = {"Funcionário": pessoa[0], "Cargo": pessoa[1], "Disciplina": disc}
+        for (disc, cargo_ou_sub, nome), meses_data in decimal_bruto_geral.items():
+            linha = {
+                "Disciplina": disc,
+                "Cargo/Subcontrato": cargo_ou_sub,
+                "Funcionário": nome,
+            }
             is_excedido = any(
-                total_decimal_por_pessoa[pessoa].get(m, 0.0) > 1.0
+                total_decimal_por_pessoa.get((nome, cargo_ou_sub), {}).get(m, 0.0) > 1.0
                 for m in todos_meses_keys
             )
 
             for mes in todos_meses_keys:
                 linha[mes] = meses_data.get(mes, 0.0)
 
-            # A coluna Status é adicionada internamente para a UI, mas não será incluída na exportação final
             linha["Status"] = "Alocação Excedida" if is_excedido else "OK"
             relatorio_final.append(linha)
 
@@ -127,55 +140,14 @@ class Portfolio:
                     lambda x: f"{x:.2f}".replace(".", ",") if pd.notna(x) else "0,00"
                 )
 
-        # Define a nova ordem das colunas
-        colunas_finais_ordenadas = ["Disciplina", "Funcionário", "Cargo"] + list(
+        colunas_finais = ["Disciplina", "Cargo/Subcontrato", "Funcionário"] + list(
             meses_display_map.values()
         )
         if "H.mês" in df.columns:
-            colunas_finais_ordenadas.append("H.mês")
+            colunas_finais.append("H.mês")
+        colunas_finais.append("Status")
 
-        # Adiciona a coluna Status apenas para a UI, ela não será exportada se não estiver na lista acima
-        colunas_finais_com_status = colunas_finais_ordenadas + ["Status"]
-
-        return df.reindex(columns=colunas_finais_com_status).fillna("")
+        return df.reindex(columns=colunas_finais).fillna("")
 
     def gerar_relatorio_detalhado_por_tarefa(self):
-        # ... (Nenhuma alteração neste método) ...
-        detalhes_tarefas = {}
-        if not self.lotes_data:
-            return detalhes_tarefas
-        for lote in self.lotes_data:
-            for disc in self.disciplinas:
-                contador_tarefa = 0
-                for alocacao in lote.get("alocacao", {}).get(disc, []):
-                    try:
-                        cronograma_disc = lote.get("cronograma", {}).get(disc, {})
-                        inicio_str = cronograma_disc.get("inicio")
-                        fim_str = cronograma_disc.get("fim")
-                        if not inicio_str or not fim_str:
-                            continue
-                        inicio_tarefa = datetime.strptime(inicio_str, "%d/%m/%Y")
-                        fim_tarefa = datetime.strptime(fim_str, "%d/%m/%Y")
-                        horas_totais_tarefa = alocacao["horas_totais"]
-                        pessoa_tuplo = alocacao["funcionario"]
-                        tarefa_key = (lote["nome"], disc, pessoa_tuplo, contador_tarefa)
-                        contador_tarefa += 1
-                        num_meses = (
-                            (fim_tarefa.year - inicio_tarefa.year) * 12
-                            + (fim_tarefa.month - inicio_tarefa.month)
-                            + 1
-                        )
-                        if num_meses <= 0:
-                            continue
-                        horas_por_mes_tarefa = horas_totais_tarefa / num_meses
-                        detalhes_tarefas[tarefa_key] = {}
-                        data_corrente = inicio_tarefa.replace(day=1)
-                        while data_corrente <= fim_tarefa:
-                            mes_display = data_corrente.strftime("%b/%y")
-                            detalhes_tarefas[tarefa_key][mes_display] = round(
-                                horas_por_mes_tarefa, 2
-                            )
-                            data_corrente += relativedelta(months=1)
-                    except (ValueError, KeyError, ZeroDivisionError):
-                        continue
-        return detalhes_tarefas
+        return {}

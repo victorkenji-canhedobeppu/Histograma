@@ -12,8 +12,16 @@ DISCIPLINAS = {
 
 CARGOS = {
     "ESTAG": "Estagiário/Projetista",
-    "ENG_CIV": "Eng. Civil",
+    "ENG_JUN": "Eng. Júnior",
     "ENG_PLE": "Eng. Pleno",
     "ENG_SEN": "Eng. Sênior",
     "COORD": "Coordenador",
+}
+
+SUBCONTRATOS = {
+    "OAE": "OAE",
+    "ILU": "Iluminação",
+    "GEO": "Geotecnia",
+    "OBA_CIV": "Obra Civil",
+    "OUTROS": "Outros",
 }

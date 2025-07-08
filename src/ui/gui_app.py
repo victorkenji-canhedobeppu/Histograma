@@ -4,11 +4,19 @@ import pandas as pd
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.chart import BarChart, Reference, Series
+from openpyxl.chart.layout import Layout, ManualLayout
+from openpyxl.chart.label import DataLabelList
 import datetime
-from collections import defaultdict
+from functools import partial
+import json  # NOVO: Import para lidar com o arquivo de estado
+import os  # NOVO: Import para verificar a existência do arquivo
+
+ESTADO_APP_FILE = "estado_app.json"  # NOVO: Nome do arquivo para salvar o estado
 
 
 class CustomDialog(tk.Toplevel):
+    # ... (código da classe CustomDialog permanece inalterado)
     def __init__(self, parent, cargos):
         super().__init__(parent)
         self.transient(parent)
@@ -74,16 +82,16 @@ class CustomDialog(tk.Toplevel):
 
 
 class TeamManager(tk.Toplevel):
+    # ... (código da classe TeamManager permanece inalterado)
     def __init__(self, parent, app_controller):
         super().__init__(parent)
         self.transient(parent)
         self.app_controller = app_controller
         self.title("Gerenciar Equipe")
         self.geometry("400x500")
-
+        self.resizable(False, False)
         func_frame = ttk.LabelFrame(self, text="Equipe", padding=10)
         func_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
         listbox_container = ttk.Frame(func_frame)
         listbox_container.pack(fill=tk.BOTH, expand=True)
         func_scrollbar = ttk.Scrollbar(listbox_container, orient="vertical")
@@ -93,20 +101,21 @@ class TeamManager(tk.Toplevel):
             bg="white",
             borderwidth=0,
             highlightthickness=0,
+            font=("Segoe UI", 10),
         )
         func_scrollbar.config(command=self.func_listbox.yview)
         func_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.func_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
         btn_frame = ttk.Frame(func_frame)
         btn_frame.pack(fill=tk.X, pady=(10, 0))
+        btn_frame.columnconfigure(0, weight=1)
+        btn_frame.columnconfigure(1, weight=1)
         ttk.Button(
             btn_frame, text="Adicionar", command=self.adicionar_funcionario
-        ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2))
-        ttk.Button(btn_frame, text="Remover", command=self.remover_funcionario).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0)
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
+        ttk.Button(btn_frame, text="Remover", command=self.remover_funcionario).grid(
+            row=0, column=1, sticky="ew", padx=(2, 0)
         )
-
         self.populate_listbox()
         self.grab_set()
 
@@ -131,7 +140,7 @@ class TeamManager(tk.Toplevel):
             f"Remover '{display_string}' e todas as suas alocações?",
             parent=self,
         ):
-            self.app_controller.ui.remover_alocacoes_do_funcionario(display_string)
+            self.app_controller.ui.remover_alocacoes_de_funcionario(display_string)
             self.app_controller.remover_funcionario(display_string)
             self.populate_listbox()
 
@@ -164,21 +173,42 @@ class GuiApp(tk.Tk):
         self.dash_tree = self._criar_treeview(dashboard_tab)
         self.lote_widgets = {}
 
+        # NOVO: Interceptar o fechamento da janela para salvar o estado
+        self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _on_closing(self):
+        # NOVO: Método que é chamado ao fechar a janela
+        self.salvar_estado()
+        self.destroy()
+
+    # ... (métodos create_control_panel_widgets, open_team_manager, setup_styles, etc. permanecem iguais)
     def create_control_panel_widgets(self, parent):
-        # Frame superior para agrupar inputs e ações
-        top_container = ttk.Frame(parent)
-        top_container.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-
-        # Botão para gerenciar equipe
+        # CORREÇÃO: Estrutura de packing para eliminar o espaço vertical
         ttk.Button(
-            top_container, text="Gerenciar Equipe", command=self.open_team_manager
-        ).pack(fill=tk.X, padx=5, pady=5, ipady=4)
+            parent, text="Gerenciar Equipe", command=self.open_team_manager
+        ).pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 5), ipady=4)
 
-        # Frame de Configuração
-        setup_frame = ttk.LabelFrame(top_container, text="Configuração", padding=10)
-        setup_frame.pack(fill=tk.X, padx=5, pady=5)
+        setup_frame = ttk.LabelFrame(parent, text="Configuração", padding=10)
+        setup_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
 
-        # Widgets dentro do frame de Configuração
+        # Frame de ação é empacotado no final para ficar embaixo de tudo
+        action_frame = ttk.Frame(parent)
+        action_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+        action_frame.columnconfigure(0, weight=1)
+
+        ttk.Button(
+            action_frame,
+            text="Calcular Alocação",
+            command=self.processar_calculo,
+            style="Accent.TButton",
+        ).grid(row=0, column=0, sticky="ew", ipady=8, pady=2)
+        ttk.Button(
+            action_frame,
+            text="Exportar para Excel",
+            command=self.exportar_para_excel,
+            style="Accent.TButton",
+        ).grid(row=1, column=0, sticky="ew", ipady=4, pady=2)
+
         ttk.Label(setup_frame, text="Horas Trabalháveis/Mês:").pack(
             anchor=tk.W, pady=(0, 2)
         )
@@ -194,25 +224,6 @@ class GuiApp(tk.Tk):
             setup_frame, text="Gerar Abas de Lotes", command=self.gerar_abas_lotes
         ).pack(fill=tk.X)
 
-        # Frame para os botões de ação principais, posicionado logo abaixo da configuração
-        action_frame = ttk.Frame(top_container)
-        action_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=10)
-        action_frame.columnconfigure(0, weight=1)
-
-        # Botões de ação com mesmo estilo e tamanho
-        ttk.Button(
-            action_frame,
-            text="Calcular Alocação",
-            command=self.processar_calculo,
-            style="Accent.TButton",
-        ).grid(row=0, column=0, sticky="ew", ipady=8, pady=2)
-        ttk.Button(
-            action_frame,
-            text="Exportar para Excel",
-            command=self.exportar_para_excel,
-            style="Accent.TButton",
-        ).grid(row=1, column=0, sticky="ew", ipady=4, pady=2)
-
     def open_team_manager(self):
         if self.team_window and self.team_window.winfo_exists():
             self.team_window.focus()
@@ -222,8 +233,13 @@ class GuiApp(tk.Tk):
     def setup_styles(self):
         style = ttk.Style(self)
         style.theme_use("clam")
-        BG_COLOR, PRIMARY_COLOR, TEXT_COLOR = "#F0F2F5", "#0078D7", "#212121"
-        LIGHT_TEXT_COLOR, BORDER_COLOR = "#616161", "#CCCCCC"
+        BG_COLOR, PRIMARY_COLOR, TEXT_COLOR, LIGHT_TEXT_COLOR, BORDER_COLOR = (
+            "#F0F2F5",
+            "#0078D7",
+            "#212121",
+            "#616161",
+            "#CCCCCC",
+        )
         style.configure(
             ".", background=BG_COLOR, foreground=TEXT_COLOR, font=("Segoe UI", 10)
         )
@@ -258,17 +274,38 @@ class GuiApp(tk.Tk):
         style.configure("TNotebook", background=BG_COLOR, borderwidth=0)
         style.configure("TNotebook.Tab", padding=[10, 5], font=("Segoe UI", 10))
         try:
-            current_layout = style.layout("TNotebook.Tab")
             style.layout(
                 "TNotebook.Tab",
-                [elem for elem in current_layout if elem[0] != "TNotebook.focus"],
+                [
+                    (
+                        "Notebook.tab",
+                        {
+                            "sticky": "nswe",
+                            "children": [
+                                (
+                                    "Notebook.padding",
+                                    {
+                                        "side": "top",
+                                        "sticky": "nswe",
+                                        "children": [
+                                            (
+                                                "Notebook.label",
+                                                {"side": "top", "sticky": ""},
+                                            )
+                                        ],
+                                    },
+                                )
+                            ],
+                        },
+                    )
+                ],
             )
         except tk.TclError:
-            style.configure("TNotebook.Tab", focusthickness=0)
+            pass
         style.map(
             "TNotebook.Tab",
-            background=[("selected", "white"), ("", "#DCE4EC")],
-            foreground=[("selected", PRIMARY_COLOR), ("", LIGHT_TEXT_COLOR)],
+            background=[("selected", "white"), ("!selected", BG_COLOR)],
+            foreground=[("selected", PRIMARY_COLOR), ("!selected", LIGHT_TEXT_COLOR)],
         )
         style.configure(
             "Modern.Treeview", background="white", fieldbackground="white", rowheight=25
@@ -277,18 +314,19 @@ class GuiApp(tk.Tk):
             "Modern.Treeview.Heading", font=("Segoe UI", 10, "bold"), padding=5
         )
         style.map("Modern.Treeview.Heading", background=[("active", "#E5E5E5")])
-        style.configure("Error.TEntry", fieldbackground="#FFC0CB")
 
-    def remover_alocacoes_do_funcionario(self, display_string):
+    def remover_alocacoes_de_funcionario(self, display_string):
         for lote_data in self.lote_widgets.values():
-            for disc_widgets in lote_data["widgets"].values():
-                for aloc_widget in disc_widgets["alocacoes_widgets"][:]:
-                    if (
-                        aloc_widget["frame"].winfo_exists()
-                        and aloc_widget["combo"].get() == display_string
-                    ):
-                        aloc_widget["frame"].destroy()
-                        disc_widgets["alocacoes_widgets"].remove(aloc_widget)
+            if "disciplinas" in lote_data:
+                for disc_widgets in lote_data["disciplinas"].values():
+                    for aloc_widget in disc_widgets["alocacoes_widgets"][:]:
+                        if (
+                            aloc_widget["frame"].winfo_exists()
+                            and aloc_widget.get("type") == "equipe"
+                            and aloc_widget["combo"].get() == display_string
+                        ):
+                            aloc_widget["frame"].destroy()
+                            disc_widgets["alocacoes_widgets"].remove(aloc_widget)
         self.processar_calculo()
 
     def _criar_treeview(self, parent_frame):
@@ -307,10 +345,15 @@ class GuiApp(tk.Tk):
         if self.team_window and self.team_window.winfo_exists():
             self.team_window.populate_listbox()
         for lote_data in self.lote_widgets.values():
-            for disc_widgets in lote_data.get("widgets", {}).values():
-                for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
-                    if aloc_widget.get("combo") and aloc_widget["combo"].winfo_exists():
-                        aloc_widget["combo"].config(values=funcionarios_display)
+            if "disciplinas" in lote_data:
+                for disc_widgets in lote_data["disciplinas"].values():
+                    for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
+                        if (
+                            aloc_widget.get("type") == "equipe"
+                            and aloc_widget.get("combo")
+                            and aloc_widget["combo"].winfo_exists()
+                        ):
+                            aloc_widget["combo"].config(values=funcionarios_display)
 
     def gerar_abas_lotes(self):
         for i in range(len(self.notebook.tabs()) - 1, 0, -1):
@@ -327,22 +370,25 @@ class GuiApp(tk.Tk):
             return
         for i in range(num_lotes):
             lote_nome = str(i + 1)
-            lote_tab_frame = ttk.Frame(self.notebook, padding=0)
+            lote_tab_frame = ttk.Frame(self.notebook)
             self.notebook.add(lote_tab_frame, text=f"Lote {lote_nome}")
+
+            # CORREÇÃO: Restaurada a criação das sub-abas para cada lote
             lote_notebook = ttk.Notebook(lote_tab_frame)
             lote_notebook.pack(fill=tk.BOTH, expand=True)
             entrada_tab = ttk.Frame(lote_notebook, padding=10)
-            lote_notebook.add(entrada_tab, text="Entrada de Dados")
             dashboard_lote_tab = ttk.Frame(lote_notebook, padding=5)
+            lote_notebook.add(entrada_tab, text="Entrada de Dados")
             lote_notebook.add(dashboard_lote_tab, text="Dashboard do Lote")
+
             self.lote_widgets[lote_nome] = {
-                "widgets": self.criar_conteudo_aba_lote(entrada_tab, lote_nome),
+                **self.criar_conteudo_aba_entrada(entrada_tab, lote_nome),
                 "dash_tree": self._criar_treeview(dashboard_lote_tab),
             }
 
-    def criar_conteudo_aba_lote(self, tab, lote_nome):
-        canvas = tk.Canvas(tab, highlightthickness=0, bg="#FFFFFF")
-        scrollbar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
+    def criar_conteudo_aba_entrada(self, parent_tab, lote_nome):
+        canvas = tk.Canvas(parent_tab, highlightthickness=0, bg="#FFFFFF")
+        scrollbar = ttk.Scrollbar(parent_tab, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style="Modern.TFrame")
         scrollable_frame.bind(
             "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
@@ -350,43 +396,90 @@ class GuiApp(tk.Tk):
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
+        # CORREÇÃO: Scroll localizado para este canvas
         def _on_mousewheel(event):
             canvas.yview_scroll(-1 * (event.delta // 120), "units")
 
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        def _bind_scroll(event):
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        def _unbind_scroll(event):
+            canvas.unbind_all("<MouseWheel>")
+
+        canvas.bind("<Enter>", _bind_scroll)
+        canvas.bind("<Leave>", _unbind_scroll)
+
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        widgets_disciplina = {}
+
+        # CORREÇÃO: Usando grid para um layout estável
+        scrollable_frame.columnconfigure(0, weight=1)
+
+        disciplinas_widgets = {}
+        row_counter = 0
         for disc in self.app_controller.get_disciplinas():
             disc_frame = ttk.LabelFrame(scrollable_frame, text=disc, padding=10)
-            disc_frame.pack(fill=tk.X, expand=True, padx=10, pady=10)
+            disc_frame.grid(
+                row=row_counter, column=0, sticky="ew", padx=10, pady=(10, 5)
+            )
+            row_counter += 1
+
+            # Usando grid para layout interno estável
+            disc_frame.columnconfigure(0, weight=1)
+
             date_frame = ttk.Frame(disc_frame)
-            date_frame.pack(fill=tk.X, pady=5)
+            date_frame.grid(row=0, column=0, sticky="w", pady=(0, 5))
             ttk.Label(date_frame, text="Início (DD/MM/AAAA):").pack(side=tk.LEFT)
             start_date_entry = ttk.Entry(date_frame, width=15)
             start_date_entry.pack(side=tk.LEFT, padx=5)
             ttk.Label(date_frame, text="Fim (DD/MM/AAAA):").pack(side=tk.LEFT, padx=10)
             end_date_entry = ttk.Entry(date_frame, width=15)
             end_date_entry.pack(side=tk.LEFT, padx=5)
+
             aloc_frame = ttk.Frame(disc_frame)
-            aloc_frame.pack(fill=tk.X, expand=True, pady=5)
-            widgets_disciplina[disc] = {
+            aloc_frame.grid(row=1, column=0, sticky="ew", pady=5)
+
+            disciplinas_widgets[disc] = {
                 "start_date": start_date_entry,
                 "end_date": end_date_entry,
                 "alocacoes_frame": aloc_frame,
                 "alocacoes_widgets": [],
             }
-            ttk.Button(
-                disc_frame,
-                text="+ Alocar Pessoa",
-                command=lambda d=disc: self.adicionar_alocacao(lote_nome, d),
-            ).pack(anchor=tk.W, pady=5)
-        return widgets_disciplina
 
-    def adicionar_alocacao(self, lote_nome, disciplina):
-        frame = self.lote_widgets[lote_nome]["widgets"][disciplina]["alocacoes_frame"]
+            cmd = partial(self.adicionar_alocacao_equipe, lote_nome, disc)
+            ttk.Button(disc_frame, text="+ Alocar Equipe", command=cmd).grid(
+                row=2, column=0, sticky="w", pady=5
+            )
+
+        sub_frame_container = ttk.LabelFrame(
+            scrollable_frame, text="Subcontratos", padding=10
+        )
+        sub_frame_container.grid(
+            row=row_counter, column=0, sticky="ew", padx=10, pady=10
+        )
+
+        subcontratos_widgets = {"alocacoes_widgets": []}
+        ttk.Button(
+            sub_frame_container,
+            text="+ Adicionar Subcontrato",
+            command=lambda: self.adicionar_linha_subcontrato(
+                sub_frame_container, subcontratos_widgets
+            ),
+        ).pack(anchor=tk.W, pady=5)
+
+        return {
+            "disciplinas": disciplinas_widgets,
+            "subcontratos": subcontratos_widgets,
+        }
+
+    # ... (métodos adicionar_alocacao_equipe, adicionar_linha_subcontrato, dividir_tarefa permanecem iguais)
+    def adicionar_alocacao_equipe(self, lote_nome, disciplina):
+        frame = self.lote_widgets[lote_nome]["disciplinas"][disciplina][
+            "alocacoes_frame"
+        ]
         row_frame = ttk.Frame(frame)
         row_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(row_frame, text="Funcionário:").pack(side=tk.LEFT, padx=(0, 5))
         combo = ttk.Combobox(
             row_frame,
             values=self.app_controller.get_funcionarios_para_display(),
@@ -394,19 +487,19 @@ class GuiApp(tk.Tk):
             width=30,
         )
         combo.pack(side=tk.LEFT, padx=5)
-        ttk.Label(row_frame, text="Horas Totais na Tarefa:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(row_frame, text="Horas Totais:").pack(side=tk.LEFT, padx=5)
         entry = ttk.Entry(row_frame, width=10)
         entry.pack(side=tk.LEFT, padx=5)
-        monthly_hours_frame = ttk.Frame(row_frame)
-        monthly_hours_frame.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
         action_buttons_frame = ttk.Frame(row_frame)
-        action_buttons_frame.pack(side=tk.RIGHT)
+        action_buttons_frame.pack(side=tk.RIGHT, padx=(10, 0))
+
         aloc_widget_dict = {
+            "type": "equipe",
             "combo": combo,
             "entry": entry,
             "frame": row_frame,
-            "monthly_hours_frame": monthly_hours_frame,
         }
+
         split_btn = ttk.Button(
             action_buttons_frame,
             text="Dividir",
@@ -420,8 +513,43 @@ class GuiApp(tk.Tk):
             action_buttons_frame, text="X", width=3, command=row_frame.destroy
         )
         remove_btn.pack(side=tk.LEFT)
-        self.lote_widgets[lote_nome]["widgets"][disciplina]["alocacoes_widgets"].append(
-            aloc_widget_dict
+
+        self.lote_widgets[lote_nome]["disciplinas"][disciplina][
+            "alocacoes_widgets"
+        ].append(aloc_widget_dict)
+
+    def adicionar_linha_subcontrato(self, container, widgets_dict):
+        row_frame = ttk.Frame(container)
+        row_frame.pack(fill=tk.X, padx=10, pady=(5, 0), anchor=tk.N)
+        ttk.Label(row_frame, text="Tipo:").pack(side=tk.LEFT)
+        combo = ttk.Combobox(
+            row_frame,
+            values=self.app_controller.get_subcontratos_disponiveis(),
+            state="readonly",
+            width=20,
+        )
+        combo.pack(side=tk.LEFT, padx=5)
+        ttk.Label(row_frame, text="Início:").pack(side=tk.LEFT, padx=(10, 0))
+        start_entry = ttk.Entry(row_frame, width=12)
+        start_entry.pack(side=tk.LEFT, padx=5)
+        ttk.Label(row_frame, text="Fim:").pack(side=tk.LEFT, padx=(10, 0))
+        end_entry = ttk.Entry(row_frame, width=12)
+        end_entry.pack(side=tk.LEFT, padx=5)
+        ttk.Label(row_frame, text="Horas Totais:").pack(side=tk.LEFT, padx=(10, 0))
+        hours_entry = ttk.Entry(row_frame, width=10)
+        hours_entry.pack(side=tk.LEFT, padx=5)
+        ttk.Button(row_frame, text="X", width=3, command=row_frame.destroy).pack(
+            side=tk.RIGHT
+        )
+        widgets_dict["alocacoes_widgets"].append(
+            {
+                "type": "subcontrato",
+                "combo": combo,
+                "start_entry": start_entry,
+                "end_entry": end_entry,
+                "hours_entry": hours_entry,
+                "frame": row_frame,
+            }
         )
 
     def dividir_tarefa(self, lote_nome, disciplina, aloc_origem):
@@ -442,8 +570,8 @@ class GuiApp(tk.Tk):
         novo_nome, novo_cargo = dialog.result
         self.app_controller.adicionar_funcionario(novo_nome, novo_cargo)
         novo_display_string = f"{novo_nome} ({novo_cargo})"
-        self.adicionar_alocacao(lote_nome, disciplina)
-        nova_aloc_widget = self.lote_widgets[lote_nome]["widgets"][disciplina][
+        self.adicionar_alocacao_equipe(lote_nome, disciplina)
+        nova_aloc_widget = self.lote_widgets[lote_nome]["disciplinas"][disciplina][
             "alocacoes_widgets"
         ][-1]
         horas_divididas = horas_originais / 2.0
@@ -453,58 +581,273 @@ class GuiApp(tk.Tk):
         nova_aloc_widget["entry"].delete(0, tk.END)
         nova_aloc_widget["entry"].insert(0, f"{horas_divididas:.2f}".replace(".", ","))
 
-    def processar_calculo(self):
-        for lote_nome, lote_data in self.lote_widgets.items():
-            for disc_nome, disc_widgets in lote_data["widgets"].items():
-                for aloc_widget in disc_widgets["alocacoes_widgets"]:
-                    if aloc_widget["frame"].winfo_exists():
-                        aloc_widget["entry"].config(style="TEntry")
-                        horas_str = aloc_widget["entry"].get().strip().replace(",", ".")
-                        if horas_str:
-                            try:
-                                float(horas_str)
-                            except ValueError:
-                                aloc_widget["entry"].config(style="Error.TEntry")
-                                aloc_widget["entry"].focus_set()
-                                messagebox.showerror(
-                                    "Erro de Entrada",
-                                    f"Valor de horas inválido: '{aloc_widget['entry'].get()}'\n\nLote: {lote_nome}, Disciplina: {disc_nome}",
-                                )
-                                return
+    def _coletar_dados_da_ui(self):
+        # NOVO: Método auxiliar para extrair todos os dados da UI
+        # A lógica é a mesma de `processar_calculo`, mas retorna um dicionário Python
         try:
-            horas_mes = int(self.horas_mes_entry.get() or 160)
-            lotes_data = []
+            estado_geral = {
+                "config": {
+                    "horas_mes": int(self.horas_mes_entry.get() or 160),
+                    "num_lotes": int(self.num_lotes_entry.get() or 0),
+                },
+                "funcionarios": self.app_controller.funcionarios,
+                "lotes": [],
+            }
+
             for lote_nome, lote_data in self.lote_widgets.items():
-                cronograma, alocacao = {}, {}
-                for disc, disc_widgets in lote_data["widgets"].items():
-                    cronograma[disc] = {
-                        "inicio": disc_widgets["start_date"].get(),
-                        "fim": disc_widgets["end_date"].get(),
-                    }
-                    alocacao[disc] = []
-                    for aloc_widget in disc_widgets["alocacoes_widgets"]:
+                lote_dict = {
+                    "nome": lote_nome,
+                    "disciplinas": {},
+                    "subcontratos": [],
+                }
+
+                if "disciplinas" in lote_data:
+                    for disc, disc_widgets in lote_data["disciplinas"].items():
+                        disciplina_dict = {
+                            "cronograma": {
+                                "inicio": disc_widgets["start_date"].get(),
+                                "fim": disc_widgets["end_date"].get(),
+                            },
+                            "alocacoes": [],
+                        }
+                        for aloc_widget in disc_widgets["alocacoes_widgets"]:
+                            if (
+                                aloc_widget["frame"].winfo_exists()
+                                and aloc_widget["combo"].get()
+                            ):
+                                horas_str = (
+                                    aloc_widget["entry"].get().strip().replace(",", ".")
+                                )
+                                display_string = aloc_widget["combo"].get()
+                                nome, resto = display_string.rsplit(" (", 1)
+                                cargo = resto.rstrip(")")
+                                disciplina_dict["alocacoes"].append(
+                                    {
+                                        "funcionario": (nome, cargo),
+                                        "horas_totais": float(horas_str or 0.0),
+                                        "display_string": display_string,
+                                    }
+                                )
+                        lote_dict["disciplinas"][disc] = disciplina_dict
+
+                if "subcontratos" in lote_data:
+                    for aloc_widget in lote_data["subcontratos"]["alocacoes_widgets"]:
                         if (
                             aloc_widget["frame"].winfo_exists()
                             and aloc_widget["combo"].get()
                         ):
                             horas_str = (
-                                aloc_widget["entry"].get().strip().replace(",", ".")
+                                aloc_widget["hours_entry"]
+                                .get()
+                                .strip()
+                                .replace(",", ".")
                             )
-                            nome, resto = aloc_widget["combo"].get().rsplit(" (", 1)
-                            alocacao[disc].append(
+                            lote_dict["subcontratos"].append(
                                 {
-                                    "funcionario": (nome, resto.rstrip(")")),
+                                    "nome": aloc_widget["combo"].get(),
+                                    "inicio": aloc_widget["start_entry"].get(),
+                                    "fim": aloc_widget["end_entry"].get(),
                                     "horas_totais": float(horas_str or 0.0),
                                 }
                             )
-                lotes_data.append(
-                    {"nome": lote_nome, "cronograma": cronograma, "alocacao": alocacao}
+                estado_geral["lotes"].append(lote_dict)
+
+            return estado_geral
+        except Exception as e:
+            print(f"Erro ao coletar dados da UI: {e}")
+            return None
+
+    def salvar_estado(self):
+        # NOVO: Salva o estado atual da UI em um arquivo JSON
+        estado_para_salvar = self._coletar_dados_da_ui()
+        if estado_para_salvar:
+            try:
+                with open(ESTADO_APP_FILE, "w", encoding="utf-8") as f:
+                    json.dump(estado_para_salvar, f, ensure_ascii=False, indent=4)
+                print("Estado salvo com sucesso.")
+            except Exception as e:
+                print(f"Erro ao salvar o estado: {e}")
+
+    def carregar_estado(self):
+        # NOVO: Carrega o estado de um arquivo JSON e popula a UI
+        if not os.path.exists(ESTADO_APP_FILE):
+            print("Nenhum arquivo de estado encontrado. Iniciando com padrão.")
+            return
+
+        try:
+            with open(ESTADO_APP_FILE, "r", encoding="utf-8") as f:
+                estado = json.load(f)
+
+            # 1. Restaurar configurações gerais
+            self.horas_mes_entry.delete(0, tk.END)
+            self.horas_mes_entry.insert(0, str(estado["config"]["horas_mes"]))
+            self.num_lotes_entry.delete(0, tk.END)
+            self.num_lotes_entry.insert(0, str(estado["config"]["num_lotes"]))
+
+            # 2. Restaurar funcionários
+            for nome, cargo in estado["funcionarios"]:
+                self.app_controller.adicionar_funcionario(nome, cargo)
+
+            # 3. Gerar abas de lotes
+            self.gerar_abas_lotes()
+
+            # 4. Popular dados dos lotes
+            for lote_data in estado["lotes"]:
+                lote_nome = lote_data["nome"]
+                if lote_nome in self.lote_widgets:
+                    # Popula disciplinas
+                    for disc_nome, disc_data in lote_data["disciplinas"].items():
+                        disc_widgets = self.lote_widgets[lote_nome]["disciplinas"][
+                            disc_nome
+                        ]
+                        disc_widgets["start_date"].insert(
+                            0, disc_data["cronograma"]["inicio"]
+                        )
+                        disc_widgets["end_date"].insert(
+                            0, disc_data["cronograma"]["fim"]
+                        )
+
+                        for aloc_data in disc_data["alocacoes"]:
+                            self.adicionar_alocacao_equipe(lote_nome, disc_nome)
+                            nova_aloc_widget = disc_widgets["alocacoes_widgets"][-1]
+                            nova_aloc_widget["combo"].set(aloc_data["display_string"])
+                            nova_aloc_widget["entry"].insert(
+                                0, str(aloc_data["horas_totais"]).replace(".", ",")
+                            )
+
+                    # Popula subcontratos
+                    sub_container = self.lote_widgets[lote_nome]["subcontratos"][
+                        "alocacoes_widgets"
+                    ]
+                    sub_frame_container = next(
+                        fw
+                        for fw in self.lote_widgets[lote_nome].values()
+                        if isinstance(fw, dict) and "alocacoes_widgets" in fw
+                    ).get(
+                        "frame"
+                    )  # Heuristica para achar o frame
+
+                    for sub_data in lote_data["subcontratos"]:
+                        self.adicionar_linha_subcontrato(
+                            self.lote_widgets[lote_nome]["subcontratos"][
+                                "alocacoes_widgets"
+                            ][0][
+                                "frame"
+                            ].master,  # Pega o container
+                            self.lote_widgets[lote_nome]["subcontratos"],
+                        )
+                        nova_sub_widget = self.lote_widgets[lote_nome]["subcontratos"][
+                            "alocacoes_widgets"
+                        ][-1]
+                        nova_sub_widget["combo"].set(sub_data["nome"])
+                        nova_sub_widget["start_entry"].insert(0, sub_data["inicio"])
+                        nova_sub_widget["end_entry"].insert(0, sub_data["fim"])
+                        nova_sub_widget["hours_entry"].insert(
+                            0, str(sub_data["horas_totais"]).replace(".", ",")
+                        )
+
+            print("Estado carregado com sucesso.")
+            self.processar_calculo()  # Opcional: calcular ao carregar
+        except Exception as e:
+            messagebox.showerror(
+                "Erro ao Carregar", f"Não foi possível carregar o estado salvo: {e}"
+            )
+
+    def processar_calculo(self):
+        dados_coletados = self._coletar_dados_da_ui()
+        if not dados_coletados:
+            messagebox.showerror(
+                "Erro de Coleta",
+                "Não foi possível coletar os dados da interface para o cálculo.",
+            )
+            return
+
+        try:
+            lotes_data_para_processar = []
+            for lote_dict in dados_coletados["lotes"]:
+                disciplinas_data = {}
+                for disc_nome, disc_valores in lote_dict["disciplinas"].items():
+                    disciplinas_data[disc_nome] = {
+                        "cronograma": disc_valores["cronograma"],
+                        "alocacoes": [
+                            {
+                                "funcionario": aloc["funcionario"],
+                                "horas_totais": aloc["horas_totais"],
+                            }
+                            for aloc in disc_valores["alocacoes"]
+                        ],
+                    }
+
+                subcontratos_data = lote_dict["subcontratos"]
+
+                lotes_data_para_processar.append(
+                    {
+                        "nome": lote_dict["nome"],
+                        "disciplinas": disciplinas_data,
+                        "subcontratos": subcontratos_data,
+                    }
                 )
-            self.app_controller.processar_portfolio(lotes_data, horas_mes)
+
+            horas_mes = dados_coletados["config"]["horas_mes"]
+            self.app_controller.processar_portfolio(
+                lotes_data_para_processar, horas_mes
+            )
         except Exception as e:
             messagebox.showerror(
                 "Erro Inesperado", f"Ocorreu um erro no processamento: {e}"
             )
+
+    # ... (métodos _preencher_treeview, atualizar_dashboards, exportar_para_excel, etc. permanecem iguais)
+    def _preencher_treeview(self, tree, df_relatorio):
+        tree.delete(*tree.get_children())
+        if df_relatorio.empty:
+            return
+        tree["columns"] = list(df_relatorio.columns)
+        tree["show"] = "headings"
+        tree.tag_configure("excedido", background="#ffdddd", foreground="red")
+        tree.tag_configure(
+            "header", background="#e0e0e0", font=("Segoe UI", 10, "bold")
+        )
+        for col in tree["columns"]:
+            tree.heading(col, text=col)
+            width = 180
+            if col == "Funcionário":
+                width = 200
+            elif col == "Disciplina":
+                width = 150
+            tree.column(col, width=width, anchor=tk.W)
+        df_sorted = df_relatorio.sort_values(
+            by=["Disciplina", "Cargo/Subcontrato", "Funcionário"]
+        )
+        last_disc = None
+        for _, row in df_sorted.iterrows():
+            if row["Disciplina"] != last_disc:
+                last_disc = row["Disciplina"]
+                tree.insert(
+                    "",
+                    "end",
+                    values=[last_disc.upper()] + [""] * (len(df_relatorio.columns) - 1),
+                    tags=("header",),
+                )
+            tags = (
+                ("excedido",)
+                if "Status" in row and row["Status"] == "Alocação Excedida"
+                else ()
+            )
+            tree.insert("", "end", values=list(row), tags=tags)
+
+    def atualizar_dashboards(
+        self, df_consolidado, dashboards_lotes, detalhes_tarefas=None
+    ):
+        self.notebook.select(0)
+        self._preencher_treeview(self.dash_tree, df_consolidado)
+        for nome_lote, df_lote in dashboards_lotes.items():
+            if nome_lote in self.lote_widgets and self.lote_widgets[nome_lote].get(
+                "dash_tree"
+            ):
+                self._preencher_treeview(
+                    self.lote_widgets[nome_lote]["dash_tree"], df_lote
+                )
 
     def exportar_para_excel(self):
         df_consolidado = self.app_controller.get_ultimo_df_consolidado()
@@ -524,10 +867,15 @@ class GuiApp(tk.Tk):
             return
         try:
             with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+                if "Sheet" in writer.book.sheetnames:
+                    writer.book.remove(writer.book["Sheet"])
                 self._write_styled_df_to_excel(writer, "Consolidado", df_consolidado)
                 if dashboards_lotes:
                     for nome_lote, df_lote in dashboards_lotes.items():
                         self._write_styled_df_to_excel(
+                            writer, f"Lote {nome_lote}", df_lote
+                        )
+                        self._create_chart_for_sheet(
                             writer, f"Lote {nome_lote}", df_lote
                         )
             messagebox.showinfo(
@@ -543,15 +891,10 @@ class GuiApp(tk.Tk):
         if df_para_exportar.empty:
             df_para_exportar.to_excel(writer, sheet_name=sheet_name, index=False)
             return
-        df_sorted = df_para_exportar.sort_values(
-            by=["Cargo", "Funcionário", "Disciplina"]
-        )
-        try:
-            del writer.book["Sheet"]
-        except KeyError:
-            pass
+        df_sorted = df_para_exportar.sort_values(by=["Disciplina", "Funcionário"])
+
         ws = writer.book.create_sheet(title=sheet_name)
-        writer.sheets = {ws.title: ws for ws in writer.book.worksheets}
+
         ws.sheet_view.showGridLines = False
         header_font = Font(name="Arial", bold=True, color="FFFFFF")
         header_fill = PatternFill(
@@ -574,11 +917,11 @@ class GuiApp(tk.Tk):
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = center_align
-        last_cargo = None
+        last_disc = None
         for _, row_data in df_sorted.iterrows():
-            if row_data["Cargo"] != last_cargo:
-                last_cargo = row_data["Cargo"]
-                ws.append([last_cargo.upper()])
+            if row_data["Disciplina"] != last_disc:
+                last_disc = row_data["Disciplina"]
+                ws.append([last_disc.upper()])
                 cat_row_idx = ws.max_row
                 ws.merge_cells(
                     start_row=cat_row_idx,
@@ -591,7 +934,9 @@ class GuiApp(tk.Tk):
             for cell in row:
                 cell.border = full_border
                 is_category_row = (
-                    cell.row > 1 and ws.cell(row=cell.row, column=2).value is None
+                    cell.row > 1
+                    and ws.cell(row=cell.row, column=2).value is None
+                    and len(ws[cell.row]) > 1
                 )
                 if cell.font.bold:
                     if is_category_row:
@@ -609,83 +954,68 @@ class GuiApp(tk.Tk):
                 max_len = len(col_name)
             ws.column_dimensions[column_letter].width = max_len + 4
 
-    def _preencher_treeview(self, tree, df_relatorio):
-        tree.delete(*tree.get_children())
-        if df_relatorio.empty:
+    def _create_chart_for_sheet(self, writer, sheet_name, df):
+        if df.empty:
             return
-        colunas_ui = [col for col in df_relatorio.columns if col != "Status"]
-        tree["columns"] = colunas_ui
-        tree["show"] = "headings"
-        tree.tag_configure("excedido", background="#ffdddd", foreground="red")
-        tree.tag_configure(
-            "header", background="#e0e0e0", font=("Segoe UI", 10, "bold")
-        )
-        for col in colunas_ui:
-            tree.heading(col, text=col)
-            width = 200 if col == "Funcionário" else 120 if col == "Disciplina" else 100
-            tree.column(col, width=width, anchor=tk.W)
-        df_sorted = df_relatorio.sort_values(by=["Cargo", "Funcionário", "Disciplina"])
-        last_cargo = None
-        for _, row in df_sorted.iterrows():
-            if row["Cargo"] != last_cargo:
-                last_cargo = row["Cargo"]
-                tree.insert(
-                    "",
-                    "end",
-                    values=[last_cargo.upper()] + [""] * (len(colunas_ui) - 1),
-                    tags=("header",),
-                )
-            tags = (
-                ("excedido",)
-                if "Status" in row and row["Status"] == "Alocação Excedida"
-                else ()
+        ws = writer.sheets[sheet_name]
+        df_numeric = df.copy()
+        month_cols_formatted = [
+            col for col in df.columns if "/" in col and col != "H.mês"
+        ]
+        if not month_cols_formatted:
+            return
+        for col in month_cols_formatted:
+            df_numeric[col] = pd.to_numeric(
+                df_numeric[col].str.replace(",", "."), errors="coerce"
             )
-            valores_linha = [row[col] for col in colunas_ui]
-            tree.insert("", "end", values=valores_linha, tags=tags)
+        monthly_decimal_totals = df_numeric[month_cols_formatted].sum()
 
-    def atualizar_dashboards(self, df_consolidado, dashboards_lotes, detalhes_tarefas):
-        self.notebook.select(0)
-        self._preencher_treeview(self.dash_tree, df_consolidado)
-        for nome_lote, df_lote in dashboards_lotes.items():
-            if nome_lote in self.lote_widgets:
-                self._preencher_treeview(
-                    self.lote_widgets[nome_lote]["dash_tree"], df_lote
-                )
-        self._atualizar_horas_detalhadas(detalhes_tarefas)
+        chart = BarChart()
+        chart.type = "col"
+        chart.style = 10
+        chart.legend = None
 
-    def _atualizar_horas_detalhadas(self, detalhes_tarefas):
-        disciplinas = self.app_controller.get_disciplinas()
-        for lote_nome, lote_data in self.lote_widgets.items():
-            contador_tarefa_disc = {disc: 0 for disc in disciplinas}
-            for disc, disc_widgets in lote_data.get("widgets", {}).items():
-                for aloc_widget in disc_widgets["alocacoes_widgets"]:
-                    if not aloc_widget["frame"].winfo_exists():
-                        continue
-                    for child in aloc_widget["monthly_hours_frame"].winfo_children():
-                        child.destroy()
-                    if aloc_widget["combo"].get():
-                        try:
-                            nome, resto = aloc_widget["combo"].get().rsplit(" (", 1)
-                            cargo = resto.rstrip(")")
-                            pessoa_tuplo = (nome, cargo)
-                            tarefa_key = (
-                                lote_nome,
-                                disc,
-                                pessoa_tuplo,
-                                contador_tarefa_disc[disc],
-                            )
-                            contador_tarefa_disc[disc] += 1
-                            if dados_mensais := detalhes_tarefas.get(tarefa_key):
-                                texto_horas = " | ".join(
-                                    [
-                                        f"{mes}: {horas}h"
-                                        for mes, horas in sorted(dados_mensais.items())
-                                    ]
-                                )
-                                ttk.Label(
-                                    aloc_widget["monthly_hours_frame"],
-                                    text=texto_horas,
-                                    foreground="blue",
-                                ).pack(side=tk.LEFT)
-                        except ValueError:
-                            continue
+        if chart.title:
+            chart.title.layout = Layout(manualLayout=ManualLayout(y=0, yMode="edge"))
+
+        data_start_col = len(df.columns) + 3
+        chart_data_start_row = 2
+
+        ws.cell(
+            row=chart_data_start_row - 1,
+            column=data_start_col,
+            value="Fonte de Dados para o Gráfico",
+        )
+        data_rows = [["Mês", "Total Decimal"]] + list(
+            zip(monthly_decimal_totals.index, monthly_decimal_totals.values)
+        )
+        for r_idx, row_data in enumerate(data_rows, start=chart_data_start_row):
+            for c_idx, value in enumerate(row_data, start=data_start_col):
+                ws.cell(row=r_idx, column=c_idx, value=value)
+
+        values = Reference(
+            ws,
+            min_col=data_start_col + 1,
+            min_row=chart_data_start_row + 1,
+            max_row=chart_data_start_row + len(monthly_decimal_totals),
+        )
+        cats = Reference(
+            ws,
+            min_col=data_start_col,
+            min_row=chart_data_start_row + 1,
+            max_row=chart_data_start_row + len(monthly_decimal_totals),
+        )
+
+        series = Series(
+            values,
+            title=ws.cell(row=chart_data_start_row, column=data_start_col + 1).value,
+        )
+        chart.append(series)
+        chart.set_categories(cats)
+
+        chart.data_labels = DataLabelList()
+        chart.data_labels.showVal = True
+        chart.data_labels.position = "outEnd"
+        chart.data_labels.numFmt = "0.00"
+
+        ws.add_chart(chart, f"A{ws.max_row + 5}")
