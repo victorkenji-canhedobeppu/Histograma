@@ -162,7 +162,7 @@ class Portfolio:
         for (disc, cargo_ou_sub, nome), meses_data in decimal_bruto_geral.items():
             linha = {
                 "Disciplina": disc,
-                "Cargo/Subcontrato": cargo_ou_sub,
+                "Cargo": cargo_ou_sub,
                 "Funcionário": nome,
             }
             is_excedido = any(
@@ -200,7 +200,7 @@ class Portfolio:
                     lambda x: f"{x:.2f}".replace(".", ",") if pd.notna(x) else "0,00"
                 )
 
-        colunas_finais = ["Disciplina", "Cargo/Subcontrato", "Funcionário"] + list(
+        colunas_finais = ["Disciplina", "Cargo", "Funcionário"] + list(
             meses_display_map.values()
         )
         if "H.mês" in df.columns:

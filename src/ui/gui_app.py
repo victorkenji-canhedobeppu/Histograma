@@ -9,6 +9,11 @@ from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.chart import BarChart, Reference, Series
 from openpyxl.chart.layout import Layout, ManualLayout
 from openpyxl.chart.label import DataLabelList
+from openpyxl.drawing.line import LineProperties
+from openpyxl.drawing.colors import SchemeColor
+
+# from openpyxl.drawing.fill import SolidColorFill
+from openpyxl.chart.shapes import GraphicalProperties
 import datetime
 import openpyxl
 from functools import partial
@@ -181,6 +186,10 @@ class GuiApp(tk.Tk):
         self.configure(bg="#F0F2F5")
         self.setup_styles()
         self.team_window = None
+
+        ### NOVO: Flag para evitar recursão na formatação de data ###
+        self._is_formatting_date = False
+
         main_frame = ttk.Frame(self, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.grid_rowconfigure(0, weight=1)
@@ -201,6 +210,121 @@ class GuiApp(tk.Tk):
         self.lote_widgets = {}
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _on_data_keyrelease(self, event):
+        """
+        Chamado quando uma tecla é solta no campo de data.
+        Formata o texto para DD/MM/AAAA e reposiciona o cursor corretamente.
+        """
+        entry = event.widget
+
+        # Pega a posição do cursor e o texto ANTES da formatação
+        cursor_pos = entry.index(tk.INSERT)
+        texto_antes = entry.get()
+
+        # Limpa o texto, mantendo apenas os dígitos
+        digitos = "".join(filter(str.isdigit, texto_antes))
+        digitos = digitos[:8]  # Limita a 8 dígitos (DDMMAAAA)
+
+        # Formata o texto com as barras
+        texto_formatado = ""
+        if len(digitos) > 4:
+            texto_formatado = f"{digitos[:2]}/{digitos[2:4]}/{digitos[4:]}"
+        elif len(digitos) > 2:
+            texto_formatado = f"{digitos[:2]}/{digitos[2:]}"
+        else:
+            texto_formatado = digitos
+
+        # Calcula o ajuste do cursor
+        # Se uma barra foi adicionada ANTES da posição original do cursor,
+        # o cursor precisa ser movido para a direita.
+        ajuste_cursor = 0
+        if len(texto_formatado) > len(texto_antes):
+            # Verifica se uma barra foi inserida nos primeiros 2 caracteres
+            if (
+                cursor_pos >= 2
+                and texto_antes.count("/") == 0
+                and texto_formatado.count("/") >= 1
+            ):
+                ajuste_cursor = 1
+            # Verifica se uma barra foi inserida nos primeiros 5 caracteres
+            if (
+                cursor_pos >= 5
+                and texto_antes.count("/") == 1
+                and texto_formatado.count("/") >= 2
+            ):
+                ajuste_cursor = 1
+
+        nova_pos_cursor = cursor_pos + ajuste_cursor
+
+        # Atualiza o texto no Entry e reposiciona o cursor
+        entry.delete(0, tk.END)
+        entry.insert(0, texto_formatado)
+        entry.icursor(nova_pos_cursor)
+
+        return "break"  # Impede que outros bindings de tecla sejam executados
+
+    def _on_combobox_click(self, event):
+        """
+        Encontra a combobox clicada e o lote ao qual ela pertence,
+        depois chama a função para atualizar suas opções.
+        """
+        combobox_alvo = event.widget
+        # Itera sobre toda a estrutura para encontrar o lote e a disciplina da combobox
+        for lote_nome, lote_data in self.lote_widgets.items():
+            if "disciplinas" in lote_data:
+                for disc_data in lote_data["disciplinas"].values():
+                    for aloc_widget in disc_data["alocacoes_widgets"]:
+                        if aloc_widget.get("combo") is combobox_alvo:
+                            self._atualizar_opcoes_funcionario(lote_nome, combobox_alvo)
+                            return  # Encontrou, pode sair
+
+    def _atualizar_opcoes_funcionario(self, lote_nome, combobox_alvo):
+        """
+        Atualiza a lista de valores de uma combobox específica, removendo funcionários
+        que já foram selecionados em outras comboboxes do mesmo lote.
+        """
+        # 1. Coleta todos os funcionários já selecionados neste lote
+        funcionarios_usados = set()
+        lote_data = self.lote_widgets[lote_nome]
+        if "disciplinas" in lote_data:
+            for disc_data in lote_data["disciplinas"].values():
+                for aloc_widget in disc_data["alocacoes_widgets"]:
+                    combo_atual = aloc_widget.get("combo")
+                    # Adiciona à lista de usados se for uma combobox diferente da clicada
+                    if combo_atual is not combobox_alvo:
+                        selecao = combo_atual.get()
+                        if selecao:
+                            funcionarios_usados.add(selecao)
+
+        # 2. Pega a lista completa de funcionários para a disciplina da combobox clicada
+        disciplina_alvo = ""
+        for disc_nome, disc_data in lote_data["disciplinas"].items():
+            for aloc_widget in disc_data["alocacoes_widgets"]:
+                if aloc_widget.get("combo") is combobox_alvo:
+                    disciplina_alvo = disc_nome
+                    break
+            if disciplina_alvo:
+                break
+
+        funcionarios_base = (
+            self.app_controller.get_funcionarios_para_display_por_disciplina(
+                disciplina_alvo
+            )
+        )
+
+        # 3. Filtra a lista, removendo os já usados
+        opcoes_disponiveis = [
+            f for f in funcionarios_base if f not in funcionarios_usados
+        ]
+
+        # 4. Garante que a seleção atual da própria combobox esteja na lista
+        selecao_propria = combobox_alvo.get()
+        if selecao_propria and selecao_propria not in opcoes_disponiveis:
+            opcoes_disponiveis.insert(0, selecao_propria)
+
+        # 5. Atualiza a lista de valores da combobox
+        combobox_alvo.config(values=opcoes_disponiveis)
 
     def _on_closing(self):
         self.salvar_estado()
@@ -249,7 +373,7 @@ class GuiApp(tk.Tk):
 
         ttk.Button(
             action_frame,
-            text="Exportar Relatório Detalhado",  # Nome atualizado para clareza
+            text="Exportar Relatório de Cronograma",  # Nome atualizado para clareza
             command=self.exportar_para_excel,
             style="Accent.TButton",
         ).grid(row=1, column=0, sticky="ew", ipady=6, pady=2)
@@ -257,7 +381,7 @@ class GuiApp(tk.Tk):
         # NOVO: Botão para exportar o resumo da equipe
         ttk.Button(
             action_frame,
-            text="Exportar Resumo da Equipe",
+            text="Exportar Planilha de Quantidades",
             command=self.exportar_resumo_equipe,  # Chama a nova função
             style="Accent.TButton",
         ).grid(row=2, column=0, sticky="ew", ipady=6, pady=2)
@@ -314,31 +438,56 @@ class GuiApp(tk.Tk):
         writer.sheets[sheet_name] = ws
         ws.sheet_view.showGridLines = False
 
+        # --- ESTILOS PADRONIZADOS ---
+        header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(
+            start_color="44546A", end_color="44546A", fill_type="solid"
+        )
+        category_font = Font(name="Arial", bold=True, size=12)
+        category_fill = PatternFill(
+            start_color="DDEBF7", end_color="DDEBF7", fill_type="solid"
+        )
+        data_font = Font(name="Arial", size=10)
+        thin_side = Side(border_style="thin", color="BFBFBF")
+        full_border = Border(
+            left=thin_side, right=thin_side, top=thin_side, bottom=thin_side
+        )
+        horas_fill = PatternFill(
+            start_color="FFFFE0", end_color="FFFFE0", fill_type="solid"
+        )  # Amarelo claro
+
         # --- 1. TABELA DE PREÇOS ---
         ws.cell(row=2, column=2, value="Tabela de Preços por Cargo").font = Font(
             bold=True, size=14
         )
-        ws.cell(row=3, column=2, value="Cargo").font = Font(bold=True)
-        ws.cell(row=3, column=3, value="Preço/Hora (R$)").font = Font(bold=True)
+        price_header_font = Font(name="Arial", bold=True, size=11)
+        cell_cargo_header = ws.cell(row=3, column=2, value="Cargo")
+        cell_cargo_header.font = price_header_font
+        cell_cargo_header.border = full_border
+        cell_preco_header = ws.cell(row=3, column=3, value="Preço/Hora (R$)")
+        cell_preco_header.font = price_header_font
+        cell_preco_header.border = full_border  # Adiciona borda
+        # ws.cell(row=3, column=2, value="Cargo").font = price_header_font
+        # ws.cell(row=3, column=3, value="Preço/Hora (R$)").font = price_header_font
 
         input_style = NamedStyle(name="input_style_resumo")
         input_style.fill = PatternFill(
             start_color="FFFFCC", end_color="FFFFCC", fill_type="solid"
         )
         input_style.number_format = '"R$" #,##0.00'
+        input_style.font = data_font
         if input_style.name not in book.style_names:
             book.add_named_style(input_style)
 
         start_row_price_table = 4
         for i, cargo_nome in enumerate(cargos, start=start_row_price_table):
-            ws.cell(row=i, column=2, value=cargo_nome)
+            ws.cell(row=i, column=2, value=cargo_nome).font = data_font
             price_cell = ws.cell(row=i, column=3)
             price_cell.style = input_style
 
         end_row_price_table = start_row_price_table + len(cargos) - 1
         price_table_range_str = f"'{sheet_name}'!${openpyxl.utils.get_column_letter(2)}${start_row_price_table}:${openpyxl.utils.get_column_letter(3)}${end_row_price_table}"
 
-        # CORRIGIDO: Esta é a forma correta de adicionar o Defined Name.
         named_range = openpyxl.workbook.defined_name.DefinedName(
             "TabelaPrecos", attr_text=price_table_range_str
         )
@@ -347,7 +496,8 @@ class GuiApp(tk.Tk):
         book.defined_names["TabelaPrecos"] = named_range
 
         # --- 2. TABELA PRINCIPAL DE DADOS ---
-        df_sorted = df.sort_values(by=["Disciplina", "Funcionário"])
+        df["Cargo"] = pd.Categorical(df["Cargo"], categories=cargos, ordered=True)
+        df_sorted = df.sort_values(by=["Disciplina", "Cargo", "Funcionário"])
         start_row_main_table = end_row_price_table + 3
 
         headers = [
@@ -359,10 +509,8 @@ class GuiApp(tk.Tk):
         ]
         for c_idx, header_text in enumerate(headers, 1):
             cell = ws.cell(row=start_row_main_table, column=c_idx, value=header_text)
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill(
-                start_color="44546A", end_color="44546A", fill_type="solid"
-            )
+            cell.font = header_font
+            cell.fill = header_fill
 
         rows = dataframe_to_rows(df_sorted, index=False, header=False)
         current_row_excel = start_row_main_table + 1
@@ -374,10 +522,8 @@ class GuiApp(tk.Tk):
                 cat_cell = ws.cell(
                     row=current_row_excel, column=1, value=disciplina_atual
                 )
-                cat_cell.font = Font(bold=True, size=12)
-                cat_cell.fill = PatternFill(
-                    start_color="DDEBF7", end_color="DDEBF7", fill_type="solid"
-                )
+                cat_cell.font = category_font
+                cat_cell.fill = category_fill
                 ws.merge_cells(
                     start_row=current_row_excel,
                     start_column=1,
@@ -388,7 +534,10 @@ class GuiApp(tk.Tk):
                 current_row_excel += 1
 
             for c_idx, value in enumerate(row_data_tuple, 1):
-                ws.cell(row=current_row_excel, column=c_idx, value=value)
+                cell = ws.cell(row=current_row_excel, column=c_idx, value=value)
+                if c_idx == 4:  # Coluna 4 é "Horas Totais Alocadas"
+                    cell.fill = horas_fill
+                    cell.font = data_font
 
             cargo_cell_coord = (
                 f"{openpyxl.utils.get_column_letter(2)}{current_row_excel}"
@@ -404,13 +553,12 @@ class GuiApp(tk.Tk):
         end_row_main_table = current_row_excel - 1
 
         # --- 3. SEÇÃO DE TOTAIS E RESUMO FINANCEIRO ---
-        # Total Geral da tabela principal
         total_geral_row = end_row_main_table + 1
         valor_col_letter = openpyxl.utils.get_column_letter(5)
         total_geral_label_cell = ws.cell(
             row=total_geral_row, column=4, value="Total Geral"
         )
-        total_geral_label_cell.font = Font(bold=True)
+        total_geral_label_cell.font = Font(name="Arial", bold=True, size=11)
         total_geral_label_cell.alignment = Alignment(horizontal="right")
 
         total_geral_valor_cell = ws.cell(
@@ -418,82 +566,75 @@ class GuiApp(tk.Tk):
             column=5,
             value=f"=SUM({valor_col_letter}{start_row_main_table+1}:{valor_col_letter}{end_row_main_table})",
         )
-        total_geral_valor_cell.font = Font(bold=True)
+        total_geral_valor_cell.font = Font(name="Arial", bold=True, size=11)
         total_geral_valor_cell.number_format = '"R$" #,##0.00'
 
-        # Tabela de Resumo Financeiro por Cargo
         start_row_summary = total_geral_row + 3
         ws.cell(
-            row=start_row_summary, column=2, value="Resumo Financeiro por Cargo"
+            row=start_row_summary, column=2, value="Resumo Financeiro por Disciplina"
         ).font = Font(bold=True, size=14)
         summary_headers = [
-            "Cargo",
+            "Disciplina",
             "Total (R$)",
-            "Desconto/Acréscimo (R$)",
+            "HH",
             "Subtotal (R$)",
         ]
         for c_idx, text in enumerate(summary_headers, 2):
-            ws.cell(row=start_row_summary + 1, column=c_idx).font = Font(bold=True)
-            ws.cell(row=start_row_summary + 1, column=c_idx).value = text
+            cell = ws.cell(row=start_row_summary + 1, column=c_idx, value=text)
+            cell.font = header_font
+            cell.fill = header_fill
 
-        # Preenche a tabela de resumo com fórmulas
-        cargo_col_main_table = openpyxl.utils.get_column_letter(2)
+        disciplina_col_main_table = openpyxl.utils.get_column_letter(3)
         valor_col_main_table = openpyxl.utils.get_column_letter(5)
-        main_table_range = f"{cargo_col_main_table}{start_row_main_table+1}:{valor_col_main_table}{end_row_main_table}"
+        disciplinas_unicas = df["Disciplina"].unique()
 
-        for i, cargo_nome in enumerate(cargos, start=start_row_summary + 2):
-            # Coluna Cargo
-            ws.cell(row=i, column=2, value=cargo_nome)
+        start_row_summary_data = start_row_summary + 2
+        for i, disciplina_nome in enumerate(disciplinas_unicas):
+            current_summary_row = start_row_summary_data + i
 
-            # Coluna Total (R$) com fórmula SOMASE
-            cargo_criteria_cell = ws.cell(row=i, column=2).coordinate
-            formula_sumif = f"=SUMIF({cargo_col_main_table}${start_row_main_table+1}:{cargo_col_main_table}${end_row_main_table}, {cargo_criteria_cell}, {valor_col_main_table}${start_row_main_table+1}:{valor_col_main_table}${end_row_main_table})"
-            total_cell = ws.cell(row=i, column=3, value=formula_sumif)
+            ws.cell(row=current_summary_row, column=2, value=disciplina_nome)
+
+            criteria_cell = ws.cell(row=current_summary_row, column=2).coordinate
+            formula_sumif = f"=SUMIF({disciplina_col_main_table}${start_row_main_table+1}:{disciplina_col_main_table}${end_row_main_table}, {criteria_cell}, {valor_col_main_table}${start_row_main_table+1}:{valor_col_main_table}${end_row_main_table})"
+            total_cell = ws.cell(row=current_summary_row, column=3, value=formula_sumif)
             total_cell.number_format = '"R$" #,##0.00'
 
-            # Coluna Desconto/Acréscimo (R$) para input do usuário
-            desconto_cell = ws.cell(row=i, column=4)
-            desconto_cell.style = input_style  # Reusa o estilo amarelo
+            desconto_cell = ws.cell(row=current_summary_row, column=4)
+            desconto_cell.style = input_style
 
-            # Coluna Subtotal (R$) com fórmula de subtração
-            formula_subtotal = f"={ws.cell(row=i, column=3).coordinate}-{ws.cell(row=i, column=4).coordinate}"
-            subtotal_cell = ws.cell(row=i, column=5, value=formula_subtotal)
+            formula_subtotal = f"={ws.cell(row=current_summary_row, column=3).coordinate}-{ws.cell(row=current_summary_row, column=4).coordinate}"
+            subtotal_cell = ws.cell(
+                row=current_summary_row, column=5, value=formula_subtotal
+            )
             subtotal_cell.number_format = '"R$" #,##0.00'
 
-        # Total Final do Resumo
-        end_row_summary = start_row_summary + 1 + len(cargos)
-        total_final_label = ws.cell(row=end_row_summary, column=4, value="Total Final")
-        total_final_label.font = Font(bold=True, size=12)
+        # --- CORREÇÃO DA POSIÇÃO DO TOTAL FINAL ---
+        last_data_row_summary = start_row_summary_data + len(disciplinas_unicas) - 1
+        total_final_row = last_data_row_summary + 1
+
+        total_final_label = ws.cell(row=total_final_row, column=4, value="Total Final")
+        total_final_label.font = Font(name="Arial", bold=True, size=12)
         total_final_label.alignment = Alignment(horizontal="right")
 
         subtotal_col_letter = openpyxl.utils.get_column_letter(5)
+        # CORREÇÃO DA FÓRMULA DE SOMA
+        formula_total_final = f"=SUM({subtotal_col_letter}{start_row_summary_data}:{subtotal_col_letter}{last_data_row_summary})"
         total_final_valor = ws.cell(
-            row=end_row_summary,
-            column=5,
-            value=f"=SUM({subtotal_col_letter}{start_row_summary+2}:{subtotal_col_letter}{end_row_summary-1})",
+            row=total_final_row, column=5, value=formula_total_final
         )
-        total_final_valor.font = Font(bold=True, size=12)
+        total_final_valor.font = Font(name="Arial", bold=True, size=12)
         total_final_valor.number_format = '"R$" #,##0.00'
 
         # --- 4. FORMATAÇÃO FINAL ---
-        horas_col_letter = openpyxl.utils.get_column_letter(4)
-        color_scale_rule = ColorScaleRule(
-            start_type="min",
-            start_color="63BE7B",
-            mid_type="percentile",
-            mid_value=50,
-            mid_color="FFEB84",
-            end_type="max",
-            end_color="F8696B",
-        )
-        range_to_format = (
-            f"{horas_col_letter}{start_row_main_table+1}:{horas_col_letter}{ws.max_row}"
-        )
-        if ws.max_row > start_row_main_table:
-            ws.conditional_formatting.add(range_to_format, color_scale_rule)
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
+            for cell in row:
+                if cell.value is not None or cell.style == "input_style_resumo":
+                    cell.border = full_border
 
-        for i in range(1, len(headers) + 1):
+        for i in range(1, len(headers) + 2):
             ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 25
+
+    # ... (O resto da classe GuiApp permanece inalterado)
 
     def open_team_manager(self):
         if self.team_window and self.team_window.winfo_exists():
@@ -667,6 +808,7 @@ class GuiApp(tk.Tk):
             width=30,
         )
         combo.pack(side=tk.LEFT, padx=5)
+        combo.bind("<Button-1>", self._on_combobox_click)
         ttk.Label(row_frame, text="Horas Totais:").pack(side=tk.LEFT, padx=5)
         entry = ttk.Entry(row_frame, width=10)
         entry.pack(side=tk.LEFT, padx=5)
@@ -1000,6 +1142,7 @@ class GuiApp(tk.Tk):
                 "dash_tree": self._criar_treeview(dashboard_lote_tab),
             }
 
+    ### MODIFICADO: Usa StringVar para os campos de data e adiciona a trace ###
     def criar_conteudo_aba_entrada(self, parent_tab, lote_nome):
         canvas = tk.Canvas(parent_tab, highlightthickness=0, bg="#FFFFFF")
         scrollbar = ttk.Scrollbar(parent_tab, orient="vertical", command=canvas.yview)
@@ -1035,12 +1178,21 @@ class GuiApp(tk.Tk):
             disc_frame.columnconfigure(0, weight=1)
             date_frame = ttk.Frame(disc_frame)
             date_frame.grid(row=0, column=0, sticky="w", pady=(0, 5))
+
+            # --- Início da Modificação ---
             ttk.Label(date_frame, text="Início (DD/MM/AAAA):").pack(side=tk.LEFT)
             start_date_entry = ttk.Entry(date_frame, width=15)
             start_date_entry.pack(side=tk.LEFT, padx=5)
+            start_date_entry.bind(
+                "<KeyRelease>", self._on_data_keyrelease
+            )  # ADICIONADO
+
             ttk.Label(date_frame, text="Fim (DD/MM/AAAA):").pack(side=tk.LEFT, padx=10)
             end_date_entry = ttk.Entry(date_frame, width=15)
             end_date_entry.pack(side=tk.LEFT, padx=5)
+            end_date_entry.bind("<KeyRelease>", self._on_data_keyrelease)  # ADICIONADO
+            # --- Fim da Modificação ---
+
             aloc_frame = ttk.Frame(disc_frame)
             aloc_frame.grid(row=1, column=0, sticky="ew", pady=5)
             disciplinas_widgets[disc] = {
@@ -1054,6 +1206,7 @@ class GuiApp(tk.Tk):
             ttk.Button(disc_frame, text="+ Alocar Equipe", command=cmd).grid(
                 row=2, column=0, sticky="w", pady=5
             )
+
         sub_frame_container = ttk.LabelFrame(
             scrollable_frame, text="Subcontratos", padding=10
         )
@@ -1073,6 +1226,7 @@ class GuiApp(tk.Tk):
             "subcontratos": subcontratos_widgets,
         }
 
+    ### MODIFICADO: Usa StringVar para os campos de data e adiciona a trace ###
     def adicionar_linha_subcontrato(self, container, widgets_dict):
         row_frame = ttk.Frame(container)
         row_frame.pack(fill=tk.X, padx=10, pady=(5, 0), anchor=tk.N)
@@ -1084,12 +1238,19 @@ class GuiApp(tk.Tk):
             width=20,
         )
         combo.pack(side=tk.LEFT, padx=5)
+
+        # --- Início da Modificação ---
         ttk.Label(row_frame, text="Início:").pack(side=tk.LEFT, padx=(10, 0))
         start_entry = ttk.Entry(row_frame, width=12)
         start_entry.pack(side=tk.LEFT, padx=5)
+        start_entry.bind("<KeyRelease>", self._on_data_keyrelease)  # ADICIONADO
+
         ttk.Label(row_frame, text="Fim:").pack(side=tk.LEFT, padx=(10, 0))
         end_entry = ttk.Entry(row_frame, width=12)
         end_entry.pack(side=tk.LEFT, padx=5)
+        end_entry.bind("<KeyRelease>", self._on_data_keyrelease)  # ADICIONADO
+        # --- Fim da Modificação ---
+
         ttk.Label(row_frame, text="Horas Totais:").pack(side=tk.LEFT, padx=(10, 0))
         hours_entry = ttk.Entry(row_frame, width=10)
         hours_entry.pack(side=tk.LEFT, padx=5)
@@ -1125,9 +1286,7 @@ class GuiApp(tk.Tk):
             elif col == "Disciplina":
                 width = 150
             tree.column(col, width=width, anchor=tk.W)
-        df_sorted = df_relatorio.sort_values(
-            by=["Disciplina", "Cargo/Subcontrato", "Funcionário"]
-        )
+        df_sorted = df_relatorio.sort_values(by=["Disciplina", "Cargo", "Funcionário"])
         last_disc = None
         for _, row in df_sorted.iterrows():
             if row["Disciplina"] != last_disc:
@@ -1252,109 +1411,151 @@ class GuiApp(tk.Tk):
             )
 
     def _write_styled_df_to_excel(self, writer, sheet_name, df):
+        # Remove a coluna de status que não é necessária no Excel
         df_para_exportar = df.drop(columns=["Status"], errors="ignore")
         if df_para_exportar.empty:
-            df_para_exportar.to_excel(writer, sheet_name=sheet_name, index=False)
             return
-        df_sorted = df_para_exportar.sort_values(by=["Disciplina", "Funcionário"])
-        ws = writer.book.create_sheet(title=sheet_name)
+
+        # Ordena por Disciplina para o agrupamento
+        df_sorted = df_para_exportar.sort_values(
+            by=["Disciplina", "Cargo", "Funcionário"]
+        )
+
+        # Escreve os dados na planilha
+        df_sorted.to_excel(
+            writer, sheet_name=sheet_name, index=False, header=False, startrow=1
+        )
+        ws = writer.sheets[sheet_name]
         ws.sheet_view.showGridLines = False
-        header_font = Font(name="Arial", bold=True, color="FFFFFF")
+
+        # --- ESTILOS PADRONIZADOS ---
+        header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
         header_fill = PatternFill(
             start_color="44546A", end_color="44546A", fill_type="solid"
         )
-        center_align = Alignment(horizontal="center", vertical="center")
-        category_font = Font(name="Arial", bold=True)
+        category_font = Font(name="Arial", bold=True, size=12)
         category_fill = PatternFill(
-            start_color="E7E6E6", end_color="E7E6E6", fill_type="solid"
-        )
-        data_font = Font(name="Arial")
+            start_color="DDEBF7", end_color="DDEBF7", fill_type="solid"
+        )  # Azul claro
+        data_font = Font(name="Arial", size=10)
         thin_side = Side(border_style="thin", color="BFBFBF")
         full_border = Border(
             left=thin_side, right=thin_side, top=thin_side, bottom=thin_side
         )
+
+        # Escreve e formata o cabeçalho
         headers = list(df_sorted.columns)
-        ws.append(headers)
-        ws.row_dimensions[1].height = 25
-        for cell in ws[1]:
+        for c_idx, header_text in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=c_idx, value=header_text)
             cell.font = header_font
             cell.fill = header_fill
-            cell.alignment = center_align
-        last_disc = None
-        for _, row_data in df_sorted.iterrows():
-            if row_data["Disciplina"] != last_disc:
-                last_disc = row_data["Disciplina"]
-                ws.append([last_disc.upper()])
-                cat_row_idx = ws.max_row
+
+        # Agrupamento por Disciplina
+        last_discipline = None
+        current_row_offset = 0
+        # Itera sobre as linhas de dados para inserir os cabeçalhos de categoria
+        for r_idx, row in enumerate(
+            dataframe_to_rows(df_sorted, index=False, header=False), 2
+        ):
+            if row[0] != last_discipline:
+                ws.insert_rows(r_idx + current_row_offset)
+
+                cat_cell = ws.cell(
+                    row=r_idx + current_row_offset, column=1, value=row[0]
+                )
+                cat_cell.font = category_font
+                cat_cell.fill = category_fill
                 ws.merge_cells(
-                    start_row=cat_row_idx,
+                    start_row=r_idx + current_row_offset,
                     start_column=1,
-                    end_row=cat_row_idx,
+                    end_row=r_idx + current_row_offset,
                     end_column=len(headers),
                 )
-            ws.append(list(row_data))
-        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=len(headers)):
-            for cell in row:
-                cell.border = full_border
-                is_category_row = (
-                    cell.row > 1
-                    and ws.cell(row=cell.row, column=2).value is None
-                    and len(ws[cell.row]) > 1
-                )
-                if cell.font.bold:
-                    if is_category_row:
-                        cell.fill = category_fill
-                        cell.font = category_font
-                else:
-                    cell.font = data_font
-        for i, col_name in enumerate(df_sorted.columns, 1):
-            column_letter = chr(64 + i)
-            try:
-                max_len = max(
-                    df_sorted[col_name].astype(str).map(len).max(), len(col_name)
-                )
-            except (TypeError, ValueError):
-                max_len = len(col_name)
-            ws.column_dimensions[column_letter].width = max_len + 4
+
+                last_discipline = row[0]
+                current_row_offset += 1
+
+        # Aplica bordas e fontes a todas as células com conteúdo
+        for row_cells in ws.iter_rows(min_row=1, max_row=ws.max_row):
+            for cell in row_cells:
+                if cell.value is not None:
+                    cell.border = full_border
+                    if not cell.font.bold:
+                        cell.font = data_font
+
+        # Ajusta a largura das colunas
+        for i, col_name in enumerate(headers, 1):
+            column_letter = openpyxl.utils.get_column_letter(i)
+            max_len = max(df_sorted[col_name].astype(str).map(len).max(), len(col_name))
+            ws.column_dimensions[column_letter].width = max(max_len + 4, 12)
 
     def _create_chart_for_sheet(self, writer, sheet_name, df):
         if df.empty:
             return
-        ws = writer.sheets[sheet_name]
+
+        ws = writer.book[sheet_name]
+
         df_numeric = df.copy()
         month_cols_formatted = [
-            col for col in df.columns if "/" in col and col != "H.mês"
+            col
+            for col in df.columns
+            if "/" in col and col != "H.mês" and "Cargo" not in col
         ]
+
         if not month_cols_formatted:
             return
+
         for col in month_cols_formatted:
             df_numeric[col] = pd.to_numeric(
                 df_numeric[col].str.replace(",", "."), errors="coerce"
             )
+
         monthly_decimal_totals = df_numeric[month_cols_formatted].sum()
+
+        if monthly_decimal_totals.sum() == 0:
+            return
+
         chart = BarChart()
         chart.type = "col"
         chart.style = 10
+        chart.title = f"Histograma de pessoal - {sheet_name}\n(Homen/mês)"
+        chart.title.layout = Layout(manualLayout=ManualLayout(y=0, yMode="edge"))
         chart.legend = None
-        if chart.title:
-            chart.title.layout = Layout(manualLayout=ManualLayout(y=0, yMode="edge"))
-        data_start_col = len(df.columns) + 3
-        chart_data_start_row = 2
-        ws.cell(
-            row=chart_data_start_row - 1,
-            column=data_start_col,
-            value="Fonte de Dados para o Gráfico",
+
+        chart.y_axis.majorGridlines = None
+        axis_line_props = LineProperties(solidFill="000000")
+        chart.y_axis.spPr = GraphicalProperties(ln=axis_line_props)
+        chart.x_axis.spPr = GraphicalProperties(ln=axis_line_props)
+        chart.x_axis.delete = False
+        chart.y_axis.delete = False
+
+        # --- INÍCIO DAS MODIFICAÇÕES ---
+
+        # 2. Mover o título para cima ajustando o layout da área de plotagem
+        # Isso move a área do gráfico (as barras) para baixo, dando mais espaço para o título.
+        chart.layout = Layout(
+            manualLayout=ManualLayout(
+                y=0.15,  # Posição Y da área de plotagem (15% a partir do topo)
+                h=0.75,  # Altura da área de plotagem (75% da altura total do gráfico)
+            )
         )
+
+        # --- FIM DAS MODIFICAÇÕES ---
+
+        data_start_col = len(df.columns) + 2
+        chart_data_start_row = 2
+
         data_rows = [["Mês", "Total Decimal"]] + list(
             zip(monthly_decimal_totals.index, monthly_decimal_totals.values)
         )
         for r_idx, row_data in enumerate(data_rows, start=chart_data_start_row):
             for c_idx, value in enumerate(row_data, start=data_start_col):
                 ws.cell(row=r_idx, column=c_idx, value=value)
+
         values = Reference(
             ws,
             min_col=data_start_col + 1,
-            min_row=chart_data_start_row + 1,
+            min_row=chart_data_start_row,
             max_row=chart_data_start_row + len(monthly_decimal_totals),
         )
         cats = Reference(
@@ -1363,16 +1564,21 @@ class GuiApp(tk.Tk):
             min_row=chart_data_start_row + 1,
             max_row=chart_data_start_row + len(monthly_decimal_totals),
         )
-        series = Series(
-            values,
-            title=ws.cell(row=chart_data_start_row, column=data_start_col + 1).value,
-        )
+
+        series = Series(values, title_from_data=True)
+
+        series.graphicalProperties.solidFill = "44546A"
+        series.graphicalProperties.line.solidFill = "44546A"
+
         chart.append(series)
         chart.set_categories(cats)
 
-        ws.add_chart(chart, f"A{ws.max_row + 5}")
+        chart.dLbls = DataLabelList()
+        chart.dLbls.showVal = True
+        chart.dLbls.showSerName = False
+        chart.dLbls.showCatName = False
+        chart.dLbls.showLegendKey = False
+        chart.dLbls.position = "outEnd"
+        chart.dLbls.numFmt = "0.00"
 
-        chart.data_labels = DataLabelList()
-        chart.data_labels.showVal = True
-        chart.data_labels.position = "outEnd"
-        chart.data_labels.numFmt = "0.00"
+        ws.add_chart(chart, f"A{ws.max_row + 5}")

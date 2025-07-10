@@ -5,27 +5,17 @@
     },
     "funcionarios": [
         [
-            "teste1",
+            "teste",
             "Estagiário/Projetista",
             "Drenagem"
         ],
         [
-            "teste3",
-            "Eng. Júnior",
+            "testge3",
+            "Estagiário/Projetista",
             "Drenagem"
         ],
         [
-            "teste5",
-            "Estagiário/Projetista",
-            "Coordenação"
-        ],
-        [
-            "teste7",
-            "Eng. Pleno",
-            "Estruturas"
-        ],
-        [
-            "teste9",
+            "tets1",
             "Estagiário/Projetista",
             "Estruturas"
         ]
@@ -43,51 +33,17 @@
                 },
                 "Drenagem": {
                     "cronograma": {
-                        "inicio": "01/01/2024",
-                        "fim": "01/02/2024"
+                        "inicio": "",
+                        "fim": ""
                     },
-                    "alocacoes": [
-                        {
-                            "funcionario": [
-                                "teste1",
-                                "Estagiário/Projetista"
-                            ],
-                            "horas_totais": 200.0,
-                            "display_string": "teste1 (Estagiário/Projetista)"
-                        },
-                        {
-                            "funcionario": [
-                                "teste3",
-                                "Eng. Júnior"
-                            ],
-                            "horas_totais": 110.0,
-                            "display_string": "teste3 (Eng. Júnior)"
-                        }
-                    ]
+                    "alocacoes": []
                 },
                 "Estruturas": {
                     "cronograma": {
-                        "inicio": "01/01/2024",
-                        "fim": "01/02/2024"
+                        "inicio": "",
+                        "fim": ""
                     },
-                    "alocacoes": [
-                        {
-                            "funcionario": [
-                                "teste7",
-                                "Eng. Pleno"
-                            ],
-                            "horas_totais": 120.0,
-                            "display_string": "teste7 (Eng. Pleno)"
-                        },
-                        {
-                            "funcionario": [
-                                "teste9",
-                                "Estagiário/Projetista"
-                            ],
-                            "horas_totais": 120.0,
-                            "display_string": "teste9 (Estagiário/Projetista)"
-                        }
-                    ]
+                    "alocacoes": []
                 },
                 "Geologia": {
                     "cronograma": {
@@ -146,51 +102,17 @@
                 },
                 "Drenagem": {
                     "cronograma": {
-                        "inicio": "01/02/2024",
-                        "fim": "01/03/2024"
+                        "inicio": "",
+                        "fim": ""
                     },
-                    "alocacoes": [
-                        {
-                            "funcionario": [
-                                "teste1",
-                                "Estagiário/Projetista"
-                            ],
-                            "horas_totais": 120.0,
-                            "display_string": "teste1 (Estagiário/Projetista)"
-                        },
-                        {
-                            "funcionario": [
-                                "teste3",
-                                "Eng. Júnior"
-                            ],
-                            "horas_totais": 500.0,
-                            "display_string": "teste3 (Eng. Júnior)"
-                        }
-                    ]
+                    "alocacoes": []
                 },
                 "Estruturas": {
                     "cronograma": {
-                        "inicio": "01/02/2024",
-                        "fim": "01/03/2024"
+                        "inicio": "",
+                        "fim": ""
                     },
-                    "alocacoes": [
-                        {
-                            "funcionario": [
-                                "teste7",
-                                "Eng. Pleno"
-                            ],
-                            "horas_totais": 150.0,
-                            "display_string": "teste7 (Eng. Pleno)"
-                        },
-                        {
-                            "funcionario": [
-                                "teste9",
-                                "Estagiário/Projetista"
-                            ],
-                            "horas_totais": 123.0,
-                            "display_string": "teste9 (Estagiário/Projetista)"
-                        }
-                    ]
+                    "alocacoes": []
                 },
                 "Geologia": {
                     "cronograma": {
