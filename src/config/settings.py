@@ -12,9 +12,9 @@ DISCIPLINAS = {
 
 CARGOS = {
     "ESTAG": "Estagiário/Projetista",
-    "ENG_JUN": "Eng. Júnior",
-    "ENG_PLE": "Eng. Pleno",
-    "ENG_SEN": "Eng. Sênior",
+    "ENG_JR": "Eng. Júnior",
+    "ENG_PL": "Eng. Pleno",
+    "ENG_SR": "Eng. Sênior",
     "COORD": "Coordenador",
 }
 

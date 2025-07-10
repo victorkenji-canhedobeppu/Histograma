@@ -1,97 +1,17 @@
 {
     "config": {
         "horas_mes": 160,
-        "num_lotes": 2
+        "num_lotes": 1
     },
     "funcionarios": [
         [
-            "teste",
-            "Estagiário/Projetista",
-            "Drenagem"
-        ],
-        [
-            "testge3",
-            "Estagiário/Projetista",
-            "Drenagem"
-        ],
-        [
-            "tets1",
-            "Estagiário/Projetista",
-            "Estruturas"
+            "rets",
+            "Coordenação"
         ]
     ],
     "lotes": [
         {
             "nome": "1",
-            "disciplinas": {
-                "Coordenação": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Drenagem": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Estruturas": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Geologia": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Geometria": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Geotecnia": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Pavimento": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Sinalização": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                },
-                "Terraplenagem": {
-                    "cronograma": {
-                        "inicio": "",
-                        "fim": ""
-                    },
-                    "alocacoes": []
-                }
-            },
-            "subcontratos": []
-        },
-        {
-            "nome": "2",
             "disciplinas": {
                 "Coordenação": {
                     "cronograma": {

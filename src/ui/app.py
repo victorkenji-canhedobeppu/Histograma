@@ -13,11 +13,12 @@ class App:
         self.ultimo_df_consolidado = None
         self.ultimo_dashboards_lotes = None
 
-    # NOVO: Método para obter o DataFrame do resumo da equipe.
     def get_resumo_equipe_df(self):
-        # Garante que os dados mais recentes da UI estão no portfólio
-        lotes_data = self.ui._coletar_dados_da_ui()["lotes"]
-        self.portfolio.definir_dados_lotes(lotes_data)
+        """Garante que os dados mais recentes da UI estão no portfólio e retorna o resumo."""
+        dados_ui = self.ui._coletar_dados_da_ui()
+        if not dados_ui:
+            return None
+        self.portfolio.definir_dados_lotes(dados_ui["lotes"])
         return self.portfolio.gerar_relatorio_horas_por_funcionario()
 
     def run(self):
@@ -40,44 +41,55 @@ class App:
         return self.ultimo_dashboards_lotes
 
     def get_funcionarios_para_display(self):
+        """Retorna a string formatada para a lista de gerenciamento de equipe."""
+        return sorted(
+            [f"{nome} [{disciplina}]" for nome, disciplina in self.funcionarios]
+        )
+
+    def get_nomes_funcionarios_por_disciplina(self, disciplina_filtro):
+        """Retorna uma lista de NOMES de funcionários para uma dada disciplina."""
         return sorted(
             [
-                f"{nome} ({cargo}) [{disciplina}]"
-                for nome, cargo, disciplina in self.funcionarios
+                nome
+                for nome, disciplina in self.funcionarios
+                if disciplina == disciplina_filtro
             ]
         )
 
-    def get_funcionarios_para_display_por_disciplina(self, disciplina_filtro):
-        funcionarios_filtrados = []
-        for nome, cargo, disciplina in self.funcionarios:
-            if disciplina == disciplina_filtro:
-                funcionarios_filtrados.append(f"{nome} ({cargo})")
-        return sorted(funcionarios_filtrados)
+    def adicionar_funcionario(self, nome, disciplina):
+        nome_tratado = nome.strip()
+        if not nome_tratado:
+            return
 
-    def adicionar_funcionario(self, nome, cargo, disciplina):
-        novo_funcionario = (nome, cargo, disciplina)
-        if novo_funcionario not in self.funcionarios:
+        novo_funcionario = (nome_tratado, disciplina)
+
+        # Verifica se um funcionário com o mesmo nome já existe
+        if not any(f[0].lower() == nome_tratado.lower() for f in self.funcionarios):
             self.funcionarios.append(novo_funcionario)
             self.funcionarios.sort(key=lambda x: x[0])
             self.ui.atualizar_lista_funcionarios()
+        else:
+            print(f"Aviso: Funcionário com nome '{nome_tratado}' já existe.")
 
     def remover_funcionario(self, display_string):
+        """Remove um funcionário baseado na sua string de exibição 'Nome [Disciplina]'."""
         try:
-            resto, disciplina = display_string.rsplit(" [", 1)
+            # Faz o parsing da string "Nome [Disciplina]"
+            nome, disciplina = display_string.rsplit(" [", 1)
             disciplina = disciplina.rstrip("]")
-            nome, cargo = resto.rsplit(" (", 1)
-            cargo = cargo.rstrip(")")
 
-            funcionario_a_remover = (nome, cargo, disciplina)
+            funcionario_a_remover = (nome, disciplina)
             if funcionario_a_remover in self.funcionarios:
                 self.funcionarios.remove(funcionario_a_remover)
                 self.ui.atualizar_lista_funcionarios()
+
         except ValueError:
             print(
                 f"Erro ao tentar remover: formato de string inválido '{display_string}'"
             )
 
     def processar_portfolio(self, lotes_data, horas_mes):
+        """Processa todos os dados e atualiza a UI com os resultados."""
         self.portfolio.definir_configuracoes_gerais(horas_mes, self.funcionarios)
         self.portfolio.definir_dados_lotes(lotes_data)
 
