@@ -3,15 +3,72 @@
 from config.settings import CARGOS, DISCIPLINAS, SUBCONTRATOS
 from core.project import Portfolio
 from ui.gui_app import GuiApp
+import psutil
+from cryptography.fernet import Fernet
+import base64
 
 
 class App:
     def __init__(self):
+        self.mac_address = self.get_mac_address()
+        try:
+            # Tenta ler e descriptografar a chave do arquivo
+            self.chave_atual = self.descriptografar_chave()
+        except Exception as e:
+            # Se o arquivo não existir ou der erro, usa um valor que garantirá a falha
+            print(
+                f"AVISO: Não foi possível ler ou descriptografar a chave: {e}. Usando fallback."
+            )
+            self.chave_atual = "ERRO-NA-CHAVE"
+
+        print(f"Endereço MAC da Máquina: {self.mac_address}")
+        print(f"Chave da Licença: {self.chave_atual}")
+
+        # Compara o MAC da máquina com a chave da licença
+        self.mac_autorizado = self.mac_address == self.chave_atual
+        if not self.mac_autorizado:
+            print(
+                "AVISO: Endereço MAC não autorizado. Funcionalidades serão desabilitadas."
+            )
+        else:
+            print("INFO: Licença validada com sucesso.")
         self.funcionarios = []
         self.portfolio = Portfolio(list(DISCIPLINAS.values()))
         self.ui = GuiApp(app_controller=self)
         self.ultimo_df_consolidado = None
         self.ultimo_dashboards_lotes = None
+
+        self.ui.set_modo_restringido(not self.mac_autorizado)
+
+    def get_mac_address(self):
+        """Obtém o endereço MAC da primeira interface de rede física."""
+        try:
+            # itera sobre todas as interfaces de rede
+            for interface, snics in psutil.net_if_addrs().items():
+                for snic in snics:
+                    # AF_LINK é o endereço MAC
+                    if snic.family == psutil.AF_LINK:
+                        # Retorna o primeiro endereço MAC encontrado que não seja de loopback
+                        if snic.address and snic.address != "00:00:00:00:00:00":
+                            # Formata para o padrão com hífens e maiúsculas
+                            return snic.address.replace(":", "-").upper()
+            return "Endereço MAC não encontrado"
+        except Exception as e:
+            return f"Erro ao obter endereço MAC: {e}"
+
+    def descriptografar_chave(self):
+        """Lê o arquivo de licença e descriptografa o endereço MAC contido nele."""
+        with open("chave.cbel", "rb") as file:
+            conteudo = base64.urlsafe_b64decode(file.read())
+
+        # Assume que o formato é chave_secreta||mensagem_criptografada
+        chave_secreta, mensagem_criptografada = conteudo.split(b"||")
+
+        fernet = Fernet(chave_secreta)
+        resultado_bytes = fernet.decrypt(mensagem_criptografada)
+
+        # Retorna o resultado decodificado e formatado
+        return resultado_bytes.decode("utf-8").strip().upper()
 
     def get_resumo_equipe_df(self):
         """Garante que os dados mais recentes da UI estão no portfólio e retorna o resumo."""

@@ -400,6 +400,12 @@ class GuiApp(tk.Tk):
                 entry.icursor(cursor_pos - 1)
 
     def _on_closing(self):
+        # Se o MAC não for autorizado, apenas fecha a janela sem salvar
+        if not self.app_controller.mac_autorizado:
+            self.destroy()
+            return
+
+        # Se for autorizado, salva o estado e fecha
         self.salvar_estado()
         self.destroy()
 
@@ -409,9 +415,12 @@ class GuiApp(tk.Tk):
         team_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 5))
         team_frame.columnconfigure(0, weight=1)
 
-        ttk.Button(
-            team_frame, text="Gerenciar Equipe", command=self.open_team_manager
-        ).grid(row=0, column=0, sticky="ew", ipady=4)
+        self.btn_team = ttk.Button(
+            team_frame,
+            text="Gerenciar Equipe",
+            command=self.open_team_manager,
+        )
+        self.btn_team.grid(row=0, column=0, sticky="ew", ipady=4)
 
         # Frame de Configuração
         setup_frame = ttk.LabelFrame(parent, text="Configuração", padding=10)
@@ -428,36 +437,64 @@ class GuiApp(tk.Tk):
         self.num_lotes_entry = ttk.Entry(setup_frame)
         self.num_lotes_entry.insert(0, "1")
         self.num_lotes_entry.pack(fill=tk.X, pady=(0, 10))
-        ttk.Button(
-            setup_frame, text="Gerar Abas de Lotes", command=self.gerar_abas_lotes
-        ).pack(fill=tk.X)
+        self.btn_lotes = ttk.Button(
+            setup_frame,
+            text="Gerar Abas de Lotes",
+            command=self.gerar_abas_lotes,
+        )
+
+        self.btn_lotes.pack(fill=tk.X)
 
         # Frame de Ações
         action_frame = ttk.LabelFrame(parent, text="Ações", padding=10)
         action_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
         action_frame.columnconfigure(0, weight=1)
 
-        ttk.Button(
+        self.btn_calcular = ttk.Button(
             action_frame,
             text="Calcular Alocação",
             command=self.processar_calculo,
             style="Accent.TButton",
-        ).grid(row=0, column=0, sticky="ew", ipady=6, pady=2)
+        )
+        self.btn_calcular.grid(row=0, column=0, sticky="ew", ipady=6, pady=2)
 
-        ttk.Button(
+        self.btn_exportar_cronograma = ttk.Button(
             action_frame,
-            text="Exportar Relatório de Cronograma",  # Nome atualizado para clareza
+            text="Exportar Relatório de Cronograma",
             command=self.exportar_para_excel,
             style="Accent.TButton",
-        ).grid(row=1, column=0, sticky="ew", ipady=6, pady=2)
+        )
+        self.btn_exportar_cronograma.grid(row=1, column=0, sticky="ew", ipady=6, pady=2)
 
-        # NOVO: Botão para exportar o resumo da equipe
-        ttk.Button(
+        self.btn_exportar_quantidades = ttk.Button(
             action_frame,
             text="Exportar Planilha de Quantidades",
-            command=self.exportar_resumo_equipe,  # Chama a nova função
+            command=self.exportar_resumo_equipe,
             style="Accent.TButton",
-        ).grid(row=2, column=0, sticky="ew", ipady=6, pady=2)
+        )
+        self.btn_exportar_quantidades.grid(
+            row=2, column=0, sticky="ew", ipady=6, pady=2
+        )
+
+    def set_modo_restringido(self, restringido):
+        """Habilita ou desabilita as funcionalidades principais da aplicação."""
+        if restringido:
+            novo_estado = tk.DISABLED
+            # Mostra um aviso claro para o usuário
+            messagebox.showerror(
+                "Licença Inválida",
+                "Este aplicativo não está licenciado para esta máquina.\nAs funcionalidades de cálculo, exportação e salvamento foram desabilitadas.",
+            )
+        else:
+            novo_estado = tk.NORMAL
+
+        # Altera o estado dos botões
+        if hasattr(self, "btn_calcular"):  # Verifica se os botões já existem
+            self.btn_team.config(state=novo_estado)
+            self.btn_lotes.config(state=novo_estado)
+            self.btn_calcular.config(state=novo_estado)
+            self.btn_exportar_cronograma.config(state=novo_estado)
+            self.btn_exportar_quantidades.config(state=novo_estado)
 
     # NOVO: Função para exportar o resumo da equipe.
     def exportar_resumo_equipe(self):
