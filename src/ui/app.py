@@ -56,6 +56,36 @@ class App:
             ]
         )
 
+    def get_tarefas_ativas(self):
+        """
+        Retorna uma lista unificada de todas as disciplinas padrão mais quaisquer
+        subcontratos que já foram adicionados a algum lote na interface.
+        """
+        # Começa com um conjunto (set) para evitar duplicatas, já preenchido com as disciplinas padrão.
+        tarefas_ativas = set(self.get_disciplinas())
+
+        # Itera sobre os widgets da UI para encontrar tarefas (subcontratos) adicionadas
+        if self.ui and self.ui.lote_widgets:
+            for lote_data in self.ui.lote_widgets.values():
+                # A chave "disciplinas" contém todas as tarefas do lote
+                for nome_da_tarefa in lote_data.get("disciplinas", {}).keys():
+                    tarefas_ativas.add(nome_da_tarefa)
+
+        # Retorna como uma lista ordenada
+        return sorted(list(tarefas_ativas))
+
+    def get_todas_as_tarefas(self):
+        """Retorna uma lista unificada de todas as disciplinas e subcontratos."""
+        disciplinas = self.get_disciplinas()
+        subcontratos = self.get_subcontratos_disponiveis()
+        return sorted(disciplinas + subcontratos)
+
+    def get_tarefas_ja_adicionadas(self, lote_nome):
+        """Retorna as tarefas que já existem na UI para um determinado lote."""
+        if lote_nome in self.ui.lote_widgets:
+            return list(self.ui.lote_widgets[lote_nome]["disciplinas"].keys())
+        return []
+
     def adicionar_funcionario(self, nome, disciplina):
         nome_tratado = nome.strip()
         if not nome_tratado:

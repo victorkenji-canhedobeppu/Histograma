@@ -1,6 +1,6 @@
 {
     "config": {
-        "horas_mes": 180,
+        "horas_mes": 160,
         "num_lotes": 1
     },
     "funcionarios": [
@@ -15,8 +15,8 @@
             "disciplinas": {
                 "Coordenação": {
                     "cronograma": {
-                        "inicio": "01/01/2024",
-                        "fim": "01/02/2024"
+                        "inicio": "01/02/2024",
+                        "fim": "01/03/2024"
                     },
                     "alocacoes": [
                         {
@@ -24,7 +24,28 @@
                                 "teste",
                                 "Estagiário/Projetista"
                             ],
-                            "horas_totais": 160.0
+                            "horas_totais": 3400.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Sênior",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 320.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Pleno",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 320.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Júnior",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 320.0
                         }
                     ]
                 },
@@ -36,6 +57,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -43,10 +71,10 @@
                         },
                         {
                             "funcionario": [
-                                "Coordenador",
-                                "Coordenador"
+                                "Eng. Pleno",
+                                "Eng. Pleno"
                             ],
-                            "horas_totais": 29.0
+                            "horas_totais": 0.0
                         },
                         {
                             "funcionario": [
@@ -57,8 +85,8 @@
                         },
                         {
                             "funcionario": [
-                                "Eng. Sênior",
-                                "Eng. Sênior"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -72,8 +100,8 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "Eng. Sênior",
-                                "Eng. Sênior"
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
                             ],
                             "horas_totais": 0.0
                         },
@@ -81,6 +109,13 @@
                             "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Pleno",
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 0.0
                         },
@@ -93,8 +128,8 @@
                         },
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -108,6 +143,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -129,8 +171,8 @@
                         },
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -144,6 +186,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -165,8 +214,8 @@
                         },
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -180,6 +229,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -201,8 +257,8 @@
                         },
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -216,6 +272,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -237,8 +300,8 @@
                         },
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -252,6 +315,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -273,8 +343,8 @@
                         },
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -288,6 +358,13 @@
                     "alocacoes": [
                         {
                             "funcionario": [
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
@@ -309,8 +386,51 @@
                         },
                         {
                             "funcionario": [
+                                "Coordenador",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
+                },
+                "Iluminação": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": [
+                        {
+                            "funcionario": [
                                 "Estagiário/Projetista",
                                 "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Sênior",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Pleno",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "Eng. Júnior",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
