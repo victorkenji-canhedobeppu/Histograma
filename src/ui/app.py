@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from config.settings import CARGOS, DISCIPLINAS, SUBCONTRATOS
+from config.settings import (
+    CARGOS,
+    DISCIPLINAS,
+    MAPEAMENTO_TAREFA_DISCIPLINA,
+    SUBCONTRATOS,
+)
 from core.project import Portfolio
 from ui.gui_app import GuiApp
 import psutil
@@ -69,6 +74,32 @@ class App:
 
         # Retorna o resultado decodificado e formatado
         return resultado_bytes.decode("utf-8").strip().upper()
+
+    def get_funcionarios_para_tarefa(self, nome_da_tarefa):
+        """
+        Retorna uma lista de funcionários qualificados para uma tarefa específica,
+        usando o novo dicionário de mapeamento.
+        """
+        disciplinas_de_origem = []
+
+        # 1. Verifica se a tarefa possui um mapeamento customizado
+        if nome_da_tarefa in MAPEAMENTO_TAREFA_DISCIPLINA:
+            disciplinas_de_origem = MAPEAMENTO_TAREFA_DISCIPLINA[nome_da_tarefa]
+        else:
+            # 2. Se não houver mapa, usa o comportamento padrão: o nome da tarefa é a disciplina
+            disciplinas_de_origem = [nome_da_tarefa]
+
+        # 3. Coleta os funcionários de todas as disciplinas de origem encontradas
+        funcionarios_qualificados = set()
+        for disciplina in disciplinas_de_origem:
+            # Reutiliza a função que já tínhamos para pegar funcionários por disciplina
+            funcionarios_encontrados = self.get_nomes_funcionarios_por_disciplina(
+                disciplina
+            )
+            for func in funcionarios_encontrados:
+                funcionarios_qualificados.add(func)
+
+        return sorted(list(funcionarios_qualificados))
 
     def get_resumo_equipe_df(self):
         """Garante que os dados mais recentes da UI estão no portfólio e retorna o resumo."""

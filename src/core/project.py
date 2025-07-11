@@ -73,7 +73,7 @@ class Portfolio:
         if not self.lotes_data:
             return pd.DataFrame()
 
-        decimal_bruto_geral = defaultdict(lambda: defaultdict(float))
+        decimal_bruto_por_tarefa = defaultdict(lambda: defaultdict(float))
         lotes_a_processar = self.lotes_data
         if nome_lote:
             lotes_a_processar = [
@@ -85,17 +85,15 @@ class Portfolio:
                 cronograma = dados_disc.get("cronograma", {})
                 for alocacao in dados_disc.get("alocacoes", []):
                     try:
-                        # --- MÉTODO REVISADO: Validação do funcionário ---
                         nome_func, cargo_func = alocacao["funcionario"]
 
-                        # Um funcionário é válido se for um cargo (alocação default) ou se estiver na lista de funcionários
+                        # Validação para garantir que o funcionário/cargo é válido
                         if nome_func in self.cargos_disponiveis:
                             employee_exists = True
                         else:
                             employee_exists = any(
                                 f[0] == nome_func for f in self.funcionarios
                             )
-
                         if not employee_exists:
                             continue
 
@@ -107,61 +105,84 @@ class Portfolio:
                         )
                         if decimais:
                             for mes, valor in decimais.items():
-                                decimal_bruto_geral[chave_agregacao][mes] += valor
+                                decimal_bruto_por_tarefa[chave_agregacao][mes] += valor
                     except (ValueError, KeyError, ZeroDivisionError):
                         continue
 
-        # ... (restante do método inalterado) ...
+        if not decimal_bruto_por_tarefa:
+            return pd.DataFrame()
+
+        # --- INÍCIO DA NOVA LÓGICA DE AGREGAÇÃO ---
+        # 1. Agrega a alocação total por pessoa, somando todas as suas tarefas.
         total_decimal_por_pessoa = defaultdict(lambda: defaultdict(float))
-        for (disc, cargo, nome), meses in decimal_bruto_geral.items():
-            if nome:
-                for mes, valor in meses.items():
-                    total_decimal_por_pessoa[(nome, cargo)][mes] += valor
+        for (disc, cargo, nome), meses in decimal_bruto_por_tarefa.items():
+            for mes, valor in meses.items():
+                # A chave aqui é apenas o NOME da pessoa
+                total_decimal_por_pessoa[nome][mes] += valor
+        # --- FIM DA NOVA LÓGICA DE AGREGAÇÃO ---
+
         todos_meses_keys = sorted(
             list(
                 set(
                     mes
-                    for meses in decimal_bruto_geral.values()
+                    for meses in decimal_bruto_por_tarefa.values()
                     for mes in meses.keys()
                 )
             )
         )
+
         relatorio_final = []
-        for (disc, cargo_ou_sub, nome), meses_data in decimal_bruto_geral.items():
+        # Itera sobre os dados brutos para criar cada linha do relatório
+        for (disc, cargo_ou_sub, nome), meses_data in decimal_bruto_por_tarefa.items():
             linha = {"Disciplina": disc, "Cargo": cargo_ou_sub, "Funcionário": nome}
+
+            # --- LÓGICA DE STATUS ATUALIZADA ---
+            # 2. Verifica se a PESSOA está superalocada em qualquer mês, usando os dados agregados.
             is_excedido = any(
-                total_decimal_por_pessoa.get((nome, cargo_ou_sub), {}).get(m, 0.0) > 1.0
+                total_decimal_por_pessoa.get(nome, {}).get(m, 0.0) > 1.0
                 for m in todos_meses_keys
             )
+            # --- FIM DA LÓGICA DE STATUS ATUALIZADA ---
+
             for mes in todos_meses_keys:
                 linha[mes] = meses_data.get(mes, 0.0)
+
             linha["Status"] = "Alocação Excedida" if is_excedido else "OK"
             relatorio_final.append(linha)
+
         df = pd.DataFrame(relatorio_final)
         if df.empty:
             return pd.DataFrame()
+
+        # O restante da formatação do DataFrame continua igual...
         colunas_meses_numericas = [key for key in todos_meses_keys if key in df.columns]
         if colunas_meses_numericas:
             df["H.mês"] = df[colunas_meses_numericas].sum(axis=1)
+
         meses_display_map = {
             key: datetime.strptime(key, "%Y-%m").strftime("%b/%y")
             for key in todos_meses_keys
         }
         df.rename(columns=meses_display_map, inplace=True)
+
         colunas_para_formatar = list(meses_display_map.values())
         if "H.mês" in df.columns:
             colunas_para_formatar.append("H.mês")
+
         for col in colunas_para_formatar:
             if col in df.columns:
                 df[col] = df[col].apply(
                     lambda x: f"{x:.2f}".replace(".", ",") if pd.notna(x) else "0,00"
                 )
-        colunas_finais = ["Disciplina", "Cargo", "Funcionário"] + list(
-            meses_display_map.values()
+
+        colunas_finais = ["Disciplina", "Cargo", "Funcionário"] + sorted(
+            list(meses_display_map.values()),
+            key=lambda x: datetime.strptime(x, "%b/%y"),
         )
         if "H.mês" in df.columns:
             colunas_finais.append("H.mês")
         colunas_finais.append("Status")
+
         return df.reindex(columns=colunas_finais).fillna("")
 
     def gerar_relatorio_detalhado_por_tarefa(self):

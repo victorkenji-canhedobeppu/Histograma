@@ -964,7 +964,7 @@ class GuiApp(tk.Tk):
         row_frame = ttk.Frame(frame)
         row_frame.pack(fill=tk.X, pady=2)
         ttk.Label(row_frame, text="Funcionário:").pack(side=tk.LEFT, padx=(0, 5))
-        nomes_funcionarios = self.app_controller.get_nomes_funcionarios_por_disciplina(
+        nomes_funcionarios = self.app_controller.get_funcionarios_para_tarefa(
             disciplina
         )
         combo_nome = ttk.Combobox(
@@ -977,12 +977,6 @@ class GuiApp(tk.Tk):
         combo_nome.set("")
 
         # NOVO: Associa o clique do mouse à função de atualização da lista
-        combo_nome.bind(
-            "<Button-1>",
-            lambda event, l=lote_nome, d=disciplina, c=combo_nome: self._atualizar_opcoes_funcionarios(
-                l, d, c
-            ),
-        )
         ttk.Label(row_frame, text="Cargo:").pack(side=tk.LEFT, padx=(0, 5))
         cargos_disponiveis = self.app_controller.get_cargos_disponiveis()
         combo_cargo = ttk.Combobox(
