@@ -22,7 +22,7 @@ class App:
         return self.portfolio.gerar_relatorio_horas_por_funcionario()
 
     def run(self):
-        self.ui.carregar_estado()
+        self.ui.carregar_ou_iniciar_ui()
         self.ui.mainloop()
 
     def get_disciplinas(self):
@@ -90,7 +90,9 @@ class App:
 
     def processar_portfolio(self, lotes_data, horas_mes):
         """Processa todos os dados e atualiza a UI com os resultados."""
-        self.portfolio.definir_configuracoes_gerais(horas_mes, self.funcionarios)
+        self.portfolio.definir_configuracoes_gerais(
+            horas_mes, self.funcionarios, self.get_cargos_disponiveis()
+        )
         self.portfolio.definir_dados_lotes(lotes_data)
 
         self.ultimo_df_consolidado = self.portfolio.gerar_relatorio_alocacao_decimal()

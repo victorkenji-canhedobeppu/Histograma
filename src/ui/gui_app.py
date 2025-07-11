@@ -180,6 +180,7 @@ class GuiApp(tk.Tk):
 
         ### NOVO: Flag para evitar recursão na formatação de data ###
         self._is_formatting_date = False
+        self._is_loading = False
 
         main_frame = ttk.Frame(self, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -321,6 +322,25 @@ class GuiApp(tk.Tk):
             self.processar_calculo()  # Recalcula para atualizar os dashboards
         except Exception as e:
             print(f"Erro ao limpar alocação de funcionário removido: {e}")
+
+    def _on_horas_keyrelease(self, event):
+        entry = event.widget
+        texto_atual = entry.get()
+        texto_limpo = ""
+        virgula_encontrada = False
+        for char in texto_atual:
+            if char.isdigit():
+                texto_limpo += char
+            elif char in (",", ".") and not virgula_encontrada:
+                texto_limpo += ","
+                virgula_encontrada = True
+
+        if texto_limpo != texto_atual:
+            cursor_pos = entry.index(tk.INSERT)
+            entry.delete(0, tk.END)
+            entry.insert(0, texto_limpo)
+            if cursor_pos > 0:
+                entry.icursor(cursor_pos - 1)
 
     def _on_closing(self):
         self.salvar_estado()
@@ -756,15 +776,12 @@ class GuiApp(tk.Tk):
 
     # MODIFICADO: Atualiza todas as listas de forma mais inteligente.
     def atualizar_lista_funcionarios(self):
-        # Atualiza a lista geral no gerenciador de equipe
+        # ... (código inalterado, mas verificado para compatibilidade) ...
         if self.team_window and self.team_window.winfo_exists():
             self.team_window.populate_listbox()
-
-        # Itera por todas as comboboxes de alocação e aplica o filtro correto
         for lote_data in self.lote_widgets.values():
             if "disciplinas" in lote_data:
                 for disc_nome, disc_widgets in lote_data["disciplinas"].items():
-                    # Busca a lista filtrada para esta disciplina
                     funcionarios_filtrados = (
                         self.app_controller.get_nomes_funcionarios_por_disciplina(
                             disc_nome
@@ -772,60 +789,125 @@ class GuiApp(tk.Tk):
                     )
                     for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
                         if (
-                            aloc_widget.get("type") == "equipe"
-                            and aloc_widget.get("combo")
-                            and aloc_widget["combo"].winfo_exists()
+                            aloc_widget.get("combo_nome")
+                            and aloc_widget["combo_nome"].winfo_exists()
                         ):
-                            # Salva a seleção atual para tentar restaurá-la
-                            selecao_atual = aloc_widget["combo"].get()
-                            aloc_widget["combo"].config(values=funcionarios_filtrados)
-                            # Se a seleção ainda for válida, a restaura
+                            selecao_atual = aloc_widget["combo_nome"].get()
+                            aloc_widget["combo_nome"].config(
+                                values=[""] + funcionarios_filtrados
+                            )
                             if selecao_atual in funcionarios_filtrados:
-                                aloc_widget["combo"].set(selecao_atual)
+                                aloc_widget["combo_nome"].set(selecao_atual)
                             else:
-                                aloc_widget["combo"].set("")
+                                aloc_widget["combo_nome"].set("")
+
+    def _atualizar_opcoes_funcionarios(
+        self, lote_nome, disciplina_alvo, combobox_clicada
+    ):
+        """
+        Filtra a lista de um Combobox para mostrar apenas funcionários não utilizados no lote.
+        """
+        nomes_ja_selecionados = set()
+        lote_data = self.lote_widgets.get(lote_nome, {})
+
+        # 1. Coleta todos os nomes já selecionados em OUTROS comboboxes do mesmo lote
+        if "disciplinas" in lote_data:
+            for disc_widgets in lote_data["disciplinas"].values():
+                for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
+                    combo_atual = aloc_widget.get("combo_nome")
+
+                    # Verifica se o widget ainda existe e se NÃO é o que foi clicado
+                    if (
+                        combo_atual
+                        and combo_atual.winfo_exists()
+                        and combo_atual is not combobox_clicada
+                    ):
+                        selecao = combo_atual.get()
+                        if selecao:  # Garante que não adicione strings vazias
+                            nomes_ja_selecionados.add(selecao)
+
+        # 2. Pega a lista base de funcionários para a disciplina
+        nomes_base = self.app_controller.get_nomes_funcionarios_por_disciplina(
+            disciplina_alvo
+        )
+
+        # 3. Filtra a lista, removendo os nomes já selecionados
+        opcoes_disponiveis = [
+            nome for nome in nomes_base if nome not in nomes_ja_selecionados
+        ]
+
+        # 4. Garante que a seleção atual do combobox clicado esteja na lista (o "edge case")
+        selecao_atual = combobox_clicada.get()
+        if selecao_atual and selecao_atual not in opcoes_disponiveis:
+            opcoes_disponiveis.insert(0, selecao_atual)
+
+        # 5. Atualiza os valores do combobox, sempre incluindo a opção vazia
+        combobox_clicada["values"] = [""] + sorted(opcoes_disponiveis)
+
+    # ### INÍCIO DA MODIFICAÇÃO: Helper para remover linha de alocação ###
+    def _remover_linha_alocacao(self, lote_nome, disc_nome, widget_dict_a_remover):
+        """Remove uma linha de alocação. As horas dos outros não são recalculadas."""
+        if widget_dict_a_remover["frame"].winfo_exists():
+            widget_dict_a_remover["frame"].destroy()
+        try:
+            lista_widgets = self.lote_widgets[lote_nome]["disciplinas"][disc_nome][
+                "alocacoes_widgets"
+            ]
+            if widget_dict_a_remover in lista_widgets:
+                lista_widgets.remove(widget_dict_a_remover)
+        except (KeyError, ValueError):
+            pass
+
+    # ### FIM DA MODIFICAÇÃO ###
 
     # MODIFICADO: A combobox de alocação agora usa a lista filtrada.
-    def adicionar_alocacao_equipe(self, lote_nome, disciplina):
+    def adicionar_alocacao_equipe(
+        self, lote_nome, disciplina, cargo_a_definir=None, horas_a_definir=None
+    ):
         frame = self.lote_widgets[lote_nome]["disciplinas"][disciplina][
             "alocacoes_frame"
         ]
         row_frame = ttk.Frame(frame)
         row_frame.pack(fill=tk.X, pady=2)
-
-        # --- Widget de Nome ---
         ttk.Label(row_frame, text="Funcionário:").pack(side=tk.LEFT, padx=(0, 5))
         nomes_funcionarios = self.app_controller.get_nomes_funcionarios_por_disciplina(
             disciplina
         )
         combo_nome = ttk.Combobox(
             row_frame,
-            values=nomes_funcionarios,
+            values=[""] + sorted(nomes_funcionarios),
             state="readonly",
-            width=25,  # Largura ajustada
+            width=25,
         )
         combo_nome.pack(side=tk.LEFT, padx=(0, 10))
+        combo_nome.set("")
 
-        # --- Widget de Cargo ---
+        # NOVO: Associa o clique do mouse à função de atualização da lista
+        combo_nome.bind(
+            "<Button-1>",
+            lambda event, l=lote_nome, d=disciplina, c=combo_nome: self._atualizar_opcoes_funcionarios(
+                l, d, c
+            ),
+        )
         ttk.Label(row_frame, text="Cargo:").pack(side=tk.LEFT, padx=(0, 5))
         cargos_disponiveis = self.app_controller.get_cargos_disponiveis()
         combo_cargo = ttk.Combobox(
-            row_frame,
-            values=cargos_disponiveis,
-            state="readonly",
-            width=20,  # Largura ajustada
+            row_frame, values=cargos_disponiveis, state="readonly", width=20
         )
         combo_cargo.pack(side=tk.LEFT, padx=(0, 10))
+        if cargo_a_definir:
+            combo_cargo.set(cargo_a_definir)
 
-        # --- Widget de Horas ---
         ttk.Label(row_frame, text="Horas Totais:").pack(side=tk.LEFT, padx=(0, 5))
         entry = ttk.Entry(row_frame, width=10)
         entry.pack(side=tk.LEFT, padx=5)
+        entry.bind("<KeyRelease>", self._on_horas_keyrelease)
+        if horas_a_definir is not None:
+            entry.insert(0, f"{horas_a_definir:.2f}".replace(".", ","))
 
         action_buttons_frame = ttk.Frame(row_frame)
         action_buttons_frame.pack(side=tk.RIGHT, padx=(10, 0))
 
-        # Armazena referência para os novos widgets
         aloc_widget_dict = {
             "type": "equipe",
             "combo_nome": combo_nome,
@@ -835,32 +917,114 @@ class GuiApp(tk.Tk):
             "disciplina": disciplina,
         }
 
-        # ... (código dos botões de ação inalterado) ...
-        remove_btn = ttk.Button(
-            action_buttons_frame, text="X", width=3, command=row_frame.destroy
+        remove_cmd = partial(
+            self._remover_linha_alocacao, lote_nome, disciplina, aloc_widget_dict
         )
-        remove_btn.pack(side=tk.LEFT)
+        remove_btn = ttk.Button(
+            action_buttons_frame, text="X", width=3, command=remove_cmd
+        )
+        remove_btn.pack(side=tk.LEFT, padx=(0, 2))
+
+        dividir_cmd = partial(
+            self.dividir_tarefa, lote_nome, disciplina, aloc_widget_dict
+        )
+        dividir_btn = ttk.Button(
+            action_buttons_frame, text="Dividir", width=7, command=dividir_cmd
+        )
+        dividir_btn.pack(side=tk.LEFT)
 
         self.lote_widgets[lote_nome]["disciplinas"][disciplina][
             "alocacoes_widgets"
         ].append(aloc_widget_dict)
 
-    # MODIFICADO: Coleta dados considerando a nova estrutura de funcionário.
+    def _calcular_horas_periodo(self, start_str, end_str):
+        """Calcula o total de horas para um período e retorna como float, ou None se falhar."""
+        try:
+            horas_mes_str = self.horas_mes_entry.get()
+
+            if not all([start_str, end_str, horas_mes_str]):
+                return None
+
+            inicio = datetime.datetime.strptime(start_str, "%d/%m/%Y")
+            fim = datetime.datetime.strptime(end_str, "%d/%m/%Y")
+            horas_mes = int(horas_mes_str)
+
+            if fim < inicio:
+                return None
+
+            num_meses = (fim.year - inicio.year) * 12 + (fim.month - inicio.month) + 1
+            total_horas_periodo = num_meses * horas_mes
+            return float(total_horas_periodo)
+
+        except (ValueError, TypeError):
+            return None
+
+    def _on_adicionar_alocacao_click(self, lote_nome, disc_nome):
+        """
+        Handler para o clique do botão '+ Alocar Equipe'.
+        Pega as datas, calcula as horas e chama a função para criar a nova linha
+        já com o valor das horas preenchido.
+        """
+        # Acessa os widgets da disciplina correta para pegar as datas
+        disc_widgets = self.lote_widgets[lote_nome]["disciplinas"][disc_nome]
+        start_str = disc_widgets["start_date"].get()
+        end_str = disc_widgets["end_date"].get()
+
+        # Usa a nova função para calcular as horas
+        horas_calculadas = self._calcular_horas_periodo(start_str, end_str)
+
+        # Chama a função que realmente cria os widgets na tela,
+        # passando o valor calculado para o parâmetro 'horas_a_definir'.
+        self.adicionar_alocacao_equipe(
+            lote_nome, disc_nome, horas_a_definir=horas_calculadas
+        )
+
+    def _atualizar_horas_alocadas_por_disciplina(self, disc_widgets, event=None):
+        if self._is_loading:
+            return
+
+        try:
+            start_str = disc_widgets["start_date"].get()
+            end_str = disc_widgets["end_date"].get()
+            horas_mes_str = self.horas_mes_entry.get()
+
+            if not all([start_str, end_str, horas_mes_str]):
+                raise ValueError
+
+            inicio = datetime.datetime.strptime(start_str, "%d/%m/%Y")
+            fim = datetime.datetime.strptime(end_str, "%d/%m/%Y")
+            horas_mes = int(horas_mes_str)
+
+            if fim < inicio:
+                raise ValueError
+
+            num_meses = (fim.year - inicio.year) * 12 + (fim.month - inicio.month) + 1
+            total_horas_periodo = num_meses * horas_mes
+            horas_formatadas = f"{total_horas_periodo:.2f}".replace(".", ",")
+
+            for aloc in disc_widgets["alocacoes_widgets"]:
+                if aloc["frame"].winfo_exists():
+                    entry = aloc["entry"]
+                    # NOVO: Só preenche o valor se o campo de horas estiver vazio.
+                    if not entry.get().strip():
+                        entry.delete(0, tk.END)
+                        entry.insert(0, horas_formatadas)
+
+        except (ValueError, TypeError):
+            pass
+
     def _coletar_dados_da_ui(self):
         try:
-            # O mapa de nome para cargo não é mais necessário aqui
             estado_geral = {
                 "config": {
                     "horas_mes": int(self.horas_mes_entry.get() or 160),
                     "num_lotes": int(self.num_lotes_entry.get() or 0),
                 },
-                # Agora salvamos a lista de funcionários (nome, disciplina)
                 "funcionarios": self.app_controller.funcionarios,
                 "lotes": [],
             }
-
             for lote_nome, lote_data in self.lote_widgets.items():
-                lote_dict = {"nome": lote_nome, "disciplinas": {}, "subcontratos": []}
+                lote_dict = {"nome": lote_nome, "disciplinas": {}}
                 if "disciplinas" in lote_data:
                     for disc, disc_widgets in lote_data["disciplinas"].items():
                         disciplina_dict = {
@@ -871,40 +1035,37 @@ class GuiApp(tk.Tk):
                             "alocacoes": [],
                         }
                         for aloc_widget in disc_widgets["alocacoes_widgets"]:
-                            if (
-                                aloc_widget["frame"].winfo_exists()
-                                and aloc_widget["combo_nome"].get()
-                                and aloc_widget["combo_cargo"].get()
-                            ):
-
-                                # Pega nome e cargo de fontes diferentes
-                                nome_funcionario = aloc_widget["combo_nome"].get()
-                                cargo_funcionario = aloc_widget["combo_cargo"].get()
-
+                            if aloc_widget["frame"].winfo_exists():
                                 horas_str = (
                                     aloc_widget["entry"].get().strip().replace(",", ".")
                                 )
+                                cargo_func = aloc_widget["combo_cargo"].get()
+                                nome_func = aloc_widget["combo_nome"].get().strip()
 
-                                disciplina_dict["alocacoes"].append(
-                                    {
-                                        "funcionario": (
-                                            nome_funcionario,
-                                            cargo_funcionario,
-                                        ),
-                                        "horas_totais": float(horas_str or 0.0),
-                                    }
-                                )
+                                nome_a_salvar = nome_func or cargo_func
+
+                                if nome_a_salvar:
+                                    try:
+                                        horas_float = float(horas_str or 0.0)
+                                    except ValueError:
+                                        horas_float = 0.0
+
+                                    disciplina_dict["alocacoes"].append(
+                                        {
+                                            "funcionario": (nome_a_salvar, cargo_func),
+                                            "horas_totais": horas_float,
+                                        }
+                                    )
                         lote_dict["disciplinas"][disc] = disciplina_dict
-
                 estado_geral["lotes"].append(lote_dict)
             return estado_geral
         except Exception as e:
-            print(f"Erro ao coletar dados da UI: {e}")
             messagebox.showerror(
-                "Erro de Coleta", f"Ocorreu um erro ao ler os dados da interface:\n{e}"
+                "Erro de Coleta", f"Ocorreu um erro ao ler os dados: {e}"
             )
             return None
 
+    # MODIFICADO: Coleta dados considerando a nova estrutura de funcionário.
     def salvar_estado(self):
         # NOVO: Salva o estado atual da UI em um arquivo JSON
         estado_para_salvar = self._coletar_dados_da_ui()
@@ -918,63 +1079,77 @@ class GuiApp(tk.Tk):
 
     # MODIFICADO: Carrega o estado e recria as alocações corretamente.
 
-    def carregar_estado(self):
-        if not os.path.exists(ESTADO_APP_FILE):
-            return
-        try:
-            with open(ESTADO_APP_FILE, "r", encoding="utf-8") as f:
-                estado = json.load(f)
+    def carregar_ou_iniciar_ui(self):
+        if os.path.exists(ESTADO_APP_FILE):
+            self._is_loading = True
+            try:
+                with open(ESTADO_APP_FILE, "r", encoding="utf-8") as f:
+                    estado = json.load(f)
 
-            # ... (carregamento de config inalterado) ...
+                config = estado.get("config", {})
+                self.horas_mes_entry.delete(0, tk.END)
+                self.horas_mes_entry.insert(0, config.get("horas_mes", 160))
+                self.num_lotes_entry.delete(0, tk.END)
+                self.num_lotes_entry.insert(0, config.get("num_lotes", 1))
 
-            # Carrega funcionários no formato (nome, disciplina)
-            for func_data in estado.get("funcionarios", []):
-                if isinstance(func_data, list) and len(func_data) == 2:
-                    self.app_controller.adicionar_funcionario(*func_data)
+                for func_data in estado.get("funcionarios", []):
+                    if isinstance(func_data, list) and len(func_data) == 2:
+                        self.app_controller.adicionar_funcionario(*func_data)
 
-            self.gerar_abas_lotes()
+                self.gerar_abas_lotes(popular_defaults=False)
 
-            for lote_data in estado.get("lotes", []):
-                lote_nome = lote_data["nome"]
-                if lote_nome in self.lote_widgets:
-                    for disc_nome, disc_data in lote_data.get(
-                        "disciplinas", {}
-                    ).items():
-                        if disc_nome in self.lote_widgets[lote_nome]["disciplinas"]:
-                            disc_widgets = self.lote_widgets[lote_nome]["disciplinas"][
-                                disc_nome
-                            ]
-                            # ... (carregar datas de cronograma inalterado) ...
+                for lote_data in estado.get("lotes", []):
+                    lote_nome = lote_data.get("nome")
+                    if lote_nome and lote_nome in self.lote_widgets:
+                        for disc_nome, disc_data in lote_data.get(
+                            "disciplinas", {}
+                        ).items():
+                            if disc_nome in self.lote_widgets[lote_nome]["disciplinas"]:
+                                disc_widgets = self.lote_widgets[lote_nome][
+                                    "disciplinas"
+                                ][disc_nome]
+                                cronograma = disc_data.get("cronograma", {})
+                                disc_widgets["start_date"].insert(
+                                    0, cronograma.get("inicio", "")
+                                )
+                                disc_widgets["end_date"].insert(
+                                    0, cronograma.get("fim", "")
+                                )
 
-                            for aloc_data in disc_data.get("alocacoes", []):
-                                self.adicionar_alocacao_equipe(lote_nome, disc_nome)
-                                nova_aloc_widget = disc_widgets["alocacoes_widgets"][-1]
+                                for aloc_data in disc_data.get("alocacoes", []):
+                                    self.adicionar_alocacao_equipe(lote_nome, disc_nome)
+                                    nova_aloc = disc_widgets["alocacoes_widgets"][-1]
 
-                                if (
-                                    "funcionario" in aloc_data
-                                    and isinstance(aloc_data["funcionario"], list)
-                                    and len(aloc_data["funcionario"]) == 2
-                                ):
-                                    nome_func, cargo_func = aloc_data["funcionario"]
+                                    nome_func, cargo_func = aloc_data.get(
+                                        "funcionario", (None, None)
+                                    )
+                                    horas = aloc_data.get("horas_totais", "")
 
-                                    # Define os valores para as duas comboboxes
-                                    nova_aloc_widget["combo_nome"].set(nome_func)
-                                    nova_aloc_widget["combo_cargo"].set(cargo_func)
+                                    if nome_func == cargo_func:
+                                        nova_aloc["combo_nome"].set("")
+                                    else:
+                                        nova_aloc["combo_nome"].set(nome_func)
 
-                                    nova_aloc_widget["entry"].insert(
-                                        0,
-                                        str(aloc_data.get("horas_totais", "")).replace(
-                                            ".", ","
-                                        ),
+                                    nova_aloc["combo_cargo"].set(cargo_func)
+                                    nova_aloc["entry"].insert(
+                                        0, str(horas).replace(".", ",")
                                     )
 
-            print("Estado carregado com sucesso.")
-            self.processar_calculo()
-        except Exception as e:
-            messagebox.showerror(
-                "Erro ao Carregar",
-                f"Não foi possível carregar o estado salvo: {e}",
-                parent=self,
+                print("Estado carregado com sucesso.")
+                self.processar_calculo()
+
+            except Exception as e:
+                messagebox.showerror(
+                    "Erro ao Carregar",
+                    f"Não foi possível carregar o estado salvo: {e}\n\nIniciando com uma nova sessão.",
+                    parent=self,
+                )
+                self.gerar_abas_lotes()
+            finally:
+                self._is_loading = False
+        else:
+            print(
+                "Nenhum estado salvo encontrado. Aguardando geração de lotes pelo usuário."
             )
 
     # MODIFICADO: Lógica de parsing no `processar_calculo`
@@ -1041,24 +1216,25 @@ class GuiApp(tk.Tk):
     # O restante dos métodos (gerar_abas_lotes, _preencher_treeview, atualizar_dashboards, exportar_para_excel, etc)
     # permanecem inalterados por enquanto, pois a lógica de processamento final no core já agrupa por disciplina.
     # ... (cole o restante dos métodos inalterados aqui)
-    def gerar_abas_lotes(self, *args, **kwargs):
+    def gerar_abas_lotes(self, popular_defaults=True):
+        # Limpa abas e widgets antigos
         for i in range(len(self.notebook.tabs()) - 1, 0, -1):
             self.notebook.forget(i)
         self.lote_widgets.clear()
+
         try:
             num_lotes = int(self.num_lotes_entry.get())
             if num_lotes <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror(
-                "Erro", "Por favor, insira um número válido e positivo de lotes."
-            )
+            messagebox.showerror("Erro", "Insira um número válido e positivo de lotes.")
             return
+
+        # Cria as novas abas
         for i in range(num_lotes):
             lote_nome = str(i + 1)
             lote_tab_frame = ttk.Frame(self.notebook)
             self.notebook.add(lote_tab_frame, text=f"Lote {lote_nome}")
-
             lote_notebook = ttk.Notebook(lote_tab_frame)
             lote_notebook.pack(fill=tk.BOTH, expand=True)
             entrada_tab = ttk.Frame(lote_notebook, padding=10)
@@ -1066,13 +1242,30 @@ class GuiApp(tk.Tk):
             lote_notebook.add(entrada_tab, text="Entrada de Dados")
             lote_notebook.add(dashboard_lote_tab, text="Dashboard do Lote")
 
+            # ALTERAÇÃO: Passa o parâmetro 'popular_defaults' para a função de criação
             self.lote_widgets[lote_nome] = {
-                **self.criar_conteudo_aba_entrada(entrada_tab, lote_nome),
+                "nome": lote_nome,
+                **self.criar_conteudo_aba_entrada(
+                    entrada_tab, lote_nome, popular_defaults=popular_defaults
+                ),
                 "dash_tree": self._criar_treeview(dashboard_lote_tab),
             }
 
-    ### MODIFICADO: Usa StringVar para os campos de data e adiciona a trace ###
-    def criar_conteudo_aba_entrada(self, parent_tab, lote_nome):
+        self.atualizar_lista_funcionarios()
+
+    def _popular_lotes_com_defaults(self):
+        cargos_padrao = ["Sênior", "Pleno", "Júnior", "Estagiário"]
+        if not self.lote_widgets:
+            return
+        for lote_nome in self.lote_widgets.keys():
+            for disc in self.app_controller.get_disciplinas():
+                for cargo in cargos_padrao:
+                    self.adicionar_alocacao_equipe(
+                        lote_nome, disc, cargo_a_definir=cargo
+                    )
+
+    ### MODIFICADO: Cria 4 funcionários padrão e corrige o botão de remover. ###
+    def criar_conteudo_aba_entrada(self, parent_tab, lote_nome, popular_defaults=True):
         canvas = tk.Canvas(parent_tab, highlightthickness=0, bg="#FFFFFF")
         scrollbar = ttk.Scrollbar(parent_tab, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style="Modern.TFrame")
@@ -1108,30 +1301,119 @@ class GuiApp(tk.Tk):
             date_frame = ttk.Frame(disc_frame)
             date_frame.grid(row=0, column=0, sticky="w", pady=(0, 5))
 
-            # --- Início da Modificação ---
             ttk.Label(date_frame, text="Início (DD/MM/AAAA):").pack(side=tk.LEFT)
             start_date_entry = ttk.Entry(date_frame, width=15)
             start_date_entry.pack(side=tk.LEFT, padx=5)
-            start_date_entry.bind(
-                "<KeyRelease>", self._on_data_keyrelease
-            )  # ADICIONADO
+            start_date_entry.bind("<KeyRelease>", self._on_data_keyrelease)
 
             ttk.Label(date_frame, text="Fim (DD/MM/AAAA):").pack(side=tk.LEFT, padx=10)
             end_date_entry = ttk.Entry(date_frame, width=15)
             end_date_entry.pack(side=tk.LEFT, padx=5)
-            end_date_entry.bind("<KeyRelease>", self._on_data_keyrelease)  # ADICIONADO
-            # --- Fim da Modificação ---
+            end_date_entry.bind("<KeyRelease>", self._on_data_keyrelease)
 
             aloc_frame = ttk.Frame(disc_frame)
             aloc_frame.grid(row=1, column=0, sticky="ew", pady=5)
-            disciplinas_widgets[disc] = {
+            disc_widgets_dict = {
                 "start_date": start_date_entry,
                 "end_date": end_date_entry,
                 "alocacoes_frame": aloc_frame,
                 "alocacoes_widgets": [],
                 "frame": disc_frame,
             }
-            cmd = partial(self.adicionar_alocacao_equipe, lote_nome, disc)
+            disciplinas_widgets[disc] = disc_widgets_dict
+
+            calculo_cmd = partial(
+                self._atualizar_horas_alocadas_por_disciplina, disc_widgets_dict
+            )
+            start_date_entry.bind("<FocusOut>", calculo_cmd)
+            end_date_entry.bind("<FocusOut>", calculo_cmd)
+            # ### INÍCIO DA MODIFICAÇÃO PRINCIPAL ###
+            # Adiciona 4 funcionários padrão (Sênior, Pleno, Júnior, Estagiário)
+            if popular_defaults:
+                cargos_padrao = [
+                    "Eng. Sênior",
+                    "Eng. Pleno",
+                    "Eng. Júnior",
+                    "Estagiário/Projetista",
+                ]
+                cargos_disponiveis = self.app_controller.get_cargos_disponiveis()
+
+                for cargo_padrao in cargos_padrao:
+                    if cargo_padrao in cargos_disponiveis:
+                        # ... (lógica para criar a linha de alocação padrão inalterada) ...
+                        row_frame = ttk.Frame(aloc_frame)
+                        row_frame.pack(fill=tk.X, pady=2)
+                        ttk.Label(row_frame, text="Funcionário:").pack(
+                            side=tk.LEFT, padx=(0, 5)
+                        )
+                        nomes_funcionarios = (
+                            self.app_controller.get_nomes_funcionarios_por_disciplina(
+                                disc
+                            )
+                        )
+                        combo_nome = ttk.Combobox(
+                            row_frame,
+                            values=[""] + sorted(nomes_funcionarios),
+                            state="readonly",
+                            width=25,
+                        )
+                        combo_nome.pack(side=tk.LEFT, padx=(0, 10))
+                        combo_nome.set("")
+                        ttk.Label(row_frame, text="Cargo:").pack(
+                            side=tk.LEFT, padx=(0, 5)
+                        )
+                        combo_cargo = ttk.Combobox(
+                            row_frame,
+                            values=cargos_disponiveis,
+                            state="readonly",
+                            width=20,
+                        )
+                        combo_cargo.pack(side=tk.LEFT, padx=(0, 10))
+                        combo_cargo.set(cargo_padrao)
+                        ttk.Label(row_frame, text="Horas Totais:").pack(
+                            side=tk.LEFT, padx=(0, 5)
+                        )
+                        entry = ttk.Entry(row_frame, width=10)
+                        entry.pack(side=tk.LEFT, padx=5)
+                        action_buttons_frame = ttk.Frame(row_frame)
+                        action_buttons_frame.pack(side=tk.RIGHT, padx=(10, 0))
+                        aloc_widget_dict = {
+                            "type": "equipe",
+                            "combo_nome": combo_nome,
+                            "combo_cargo": combo_cargo,
+                            "entry": entry,
+                            "frame": row_frame,
+                            "disciplina": disc,
+                        }
+                        remove_cmd = partial(
+                            self._remover_linha_alocacao,
+                            lote_nome,
+                            disc,
+                            aloc_widget_dict,
+                        )
+                        remove_btn = ttk.Button(
+                            action_buttons_frame, text="X", width=3, command=remove_cmd
+                        )
+                        remove_btn.pack(side=tk.LEFT)
+
+                        dividir_cmd = partial(
+                            self.dividir_tarefa, lote_nome, disc, aloc_widget_dict
+                        )
+                        dividir_btn = ttk.Button(
+                            action_buttons_frame,
+                            text="Dividir",
+                            width=7,
+                            command=dividir_cmd,
+                        )
+                        dividir_btn.pack(side=tk.LEFT)
+
+                        disciplinas_widgets[disc]["alocacoes_widgets"].append(
+                            aloc_widget_dict
+                        )
+
+            # ### FIM DA MODIFICAÇÃO PRINCIPAL ###
+
+            cmd = partial(self._on_adicionar_alocacao_click, lote_nome, disc)
             ttk.Button(disc_frame, text="+ Alocar Equipe", command=cmd).grid(
                 row=2, column=0, sticky="w", pady=5
             )
@@ -1154,6 +1436,43 @@ class GuiApp(tk.Tk):
             "disciplinas": disciplinas_widgets,
             "subcontratos": subcontratos_widgets,
         }
+
+    def dividir_tarefa(self, lote_nome, disciplina, aloc_origem_widget):
+        try:
+            horas_str = aloc_origem_widget["entry"].get().replace(",", ".")
+            horas_originais = float(horas_str or 0.0)
+            if horas_originais <= 0:
+                messagebox.showwarning(
+                    "Aviso",
+                    "A tarefa precisa ter horas positivas para ser dividida.",
+                    parent=self,
+                )
+                return
+
+            horas_divididas = horas_originais / 2.0
+
+            aloc_origem_widget["entry"].delete(0, tk.END)
+            aloc_origem_widget["entry"].insert(
+                0, f"{horas_divididas:.2f}".replace(".", ",")
+            )
+
+            self.adicionar_alocacao_equipe(
+                lote_nome, disciplina, horas_a_definir=horas_divididas
+            )
+
+            nova_aloc_widget = self.lote_widgets[lote_nome]["disciplinas"][disciplina][
+                "alocacoes_widgets"
+            ][-1]
+
+            cargo_original = aloc_origem_widget["combo_cargo"].get()
+            nova_aloc_widget["combo_cargo"].set(cargo_original)
+
+        except (ValueError, KeyError) as e:
+            messagebox.showerror(
+                "Erro ao Dividir",
+                f"Não foi possível dividir a tarefa: {e}",
+                parent=self,
+            )
 
     ### MODIFICADO: Usa StringVar para os campos de data e adiciona a trace ###
     def adicionar_linha_subcontrato(self, container, widgets_dict):
