@@ -250,3 +250,9 @@ class App:
             detalhes_tarefas,
             alerta_composicao=alerta_composicao,
         )
+
+    def resetar_equipe(self):
+        """Limpa a lista de funcionários e atualiza a interface."""
+        self.funcionarios.clear()
+        # Chama a função da UI para garantir que a janela "Gerenciar Equipe" também seja limpa se estiver aberta.
+        self.ui.atualizar_lista_funcionarios()

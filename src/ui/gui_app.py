@@ -483,6 +483,58 @@ class GuiApp(tk.Tk):
             row=2, column=0, sticky="ew", ipady=6, pady=2
         )
 
+        ttk.Separator(action_frame, orient="horizontal").grid(
+            row=3, column=0, sticky="ew", pady=(10, 5)
+        )
+
+        # Cria o botão de Reset
+        self.btn_resetar = ttk.Button(
+            action_frame,
+            text="Resetar Tudo",
+            command=self.resetar_interface_completa,
+        )
+        self.btn_resetar.grid(row=4, column=0, sticky="ew", ipady=4, pady=2)
+
+    def resetar_interface_completa(self):
+        """
+        Pede confirmação e, se positivo, reseta toda a aplicação para o estado inicial.
+        """
+        # 1. Pede confirmação ao usuário - Ação destrutiva!
+        if not messagebox.askyesno(
+            "Confirmar Reset",
+            "Você tem certeza que deseja apagar TODOS os dados e reiniciar a interface?\n\nEsta ação não pode ser desfeita.",
+            parent=self,
+        ):
+            return  # Usuário clicou em "Não"
+
+        print("INFO: Iniciando reset completo da aplicação.")
+
+        # 2. Limpa os dados do controlador (lista de funcionários)
+        self.app_controller.resetar_equipe()
+
+        # 3. Reseta os campos de entrada do painel de controle
+        self.horas_mes_entry.delete(0, tk.END)
+        self.horas_mes_entry.insert(0, "160")
+        self.num_lotes_entry.delete(0, tk.END)
+        self.num_lotes_entry.insert(0, "1")
+
+        # 4. Usa a função que já temos para limpar e recriar as abas de lote do zero
+        self.gerar_abas_lotes(popular_defaults=True)
+
+        # 5. Limpa a tabela do dashboard consolidado
+        self.dash_tree.delete(*self.dash_tree.get_children())
+
+        # 6. Limpa os dados de relatórios antigos
+        self.ultimo_df_consolidado = None
+        if self.app_controller.ultimo_dashboards_lotes:
+            self.app_controller.ultimo_dashboards_lotes.clear()
+
+        messagebox.showinfo(
+            "Reset Concluído",
+            "A aplicação foi resetada para o estado inicial.",
+            parent=self,
+        )
+
     def set_modo_restringido(self, restringido):
         """Habilita ou desabilita as funcionalidades principais da aplicação."""
         if restringido:
