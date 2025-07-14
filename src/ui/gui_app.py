@@ -157,13 +157,27 @@ class TeamManager(tk.Toplevel):
         selecionados = self.func_listbox.curselection()
         if not selecionados:
             return
+
         display_string = self.func_listbox.get(selecionados[0])
+
         if messagebox.askyesno(
             "Confirmar Remoção",
             f"Remover '{display_string}' e todas as suas alocações?",
             parent=self,
         ):
-            self.app_controller.ui.remover_alocacoes_de_funcionario(display_string)
+            # --- INÍCIO DA CORREÇÃO ---
+            # 1. Extrai apenas o nome do funcionário da string de exibição.
+            try:
+                nome_a_remover, _ = display_string.rsplit(" [", 1)
+            except ValueError:
+                # Fallback caso a string não tenha o formato esperado
+                nome_a_remover = display_string
+
+            # 2. Passa APENAS o nome para a função que limpa as alocações.
+            self.app_controller.ui.remover_alocacoes_de_funcionario(nome_a_remover)
+            # --- FIM DA CORREÇÃO ---
+
+            # Esta parte permanece a mesma, mas agora usa a string original para remover da lista da equipe.
             self.app_controller.remover_funcionario(display_string)
             self.populate_listbox()
 
@@ -226,38 +240,33 @@ class GuiApp(tk.Tk):
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
-    def _abrir_dialogo_adicionar_subcontrato(self, lote_nome, parent_frame):
-        """Abre um diálogo para o usuário selecionar e adicionar um novo SUBCONTRATO ao lote."""
-        # Pega a lista de TODOS os subcontratos possíveis
-        todos_subcontratos = self.app_controller.get_subcontratos_disponiveis()
+    def _abrir_dialogo_adicionar_tarefa(self, lote_nome, parent_frame):
+        """Abre um diálogo para o usuário selecionar e adicionar uma nova tarefa (Subcontrato ou Outros)."""
+        # Chama o novo método do controlador que retorna a lista unificada
+        todas_as_tarefas_add = self.app_controller.get_tarefas_adicionais_disponiveis()
 
-        # Pega a lista de TODAS as tarefas que já estão no lote (sejam disciplinas ou subcontratos)
         tarefas_ja_adicionadas = self.app_controller.get_tarefas_ja_adicionadas(
             lote_nome
         )
 
-        # Filtra a lista de subcontratos, mostrando apenas os que ainda não foram adicionados
-        subcontratos_disponiveis = [
-            s for s in todos_subcontratos if s not in tarefas_ja_adicionadas
+        tarefas_disponiveis = [
+            t for t in todas_as_tarefas_add if t not in tarefas_ja_adicionadas
         ]
 
-        if not subcontratos_disponiveis:
+        if not tarefas_disponiveis:
             messagebox.showinfo(
-                "Sem Subcontratos",
-                "Todos os subcontratos disponíveis já foram adicionados a este lote.",
+                "Sem Tarefas",
+                "Todas as tarefas adicionáveis já foram incluídas neste lote.",
                 parent=self,
             )
             return
 
-        dialog = SelecionarTarefaDialog(
-            self, "Adicionar Subcontrato", subcontratos_disponiveis
-        )
-        novo_subcontrato = dialog.resultado
+        dialog = SelecionarTarefaDialog(self, "Adicionar Tarefa", tarefas_disponiveis)
+        nova_tarefa = dialog.resultado
 
-        if novo_subcontrato:
-            # A função _criar_frame_tarefa é genérica e funciona perfeitamente aqui
+        if nova_tarefa:
             self._criar_frame_tarefa(
-                parent_frame, lote_nome, novo_subcontrato, popular_defaults=True
+                parent_frame, lote_nome, nova_tarefa, popular_defaults=True
             )
 
     def _on_data_keyrelease(self, event):
@@ -347,9 +356,7 @@ class GuiApp(tk.Tk):
 
         # 2. Obtém a lista de nomes base para a disciplina
         disciplina_alvo = aloc_widget_clicado.get("disciplina")
-        nomes_base = self.app_controller.get_nomes_funcionarios_por_disciplina(
-            disciplina_alvo
-        )
+        nomes_base = self.app_controller.get_funcionarios_para_tarefa(disciplina_alvo)
 
         # 3. Filtra os nomes disponíveis
         opcoes_disponiveis = [nome for nome in nomes_base if nome not in nomes_usados]
@@ -838,22 +845,30 @@ class GuiApp(tk.Tk):
         )
         style.map("Modern.Treeview.Heading", background=[("active", "#E5E5E5")])
 
-    def remover_alocacoes_de_funcionario(self, display_string):
-        # ... (código inalterado)
+    def remover_alocacoes_de_funcionario(self, nome_removido):
+        """
+        Varre todos os lotes e tarefas, removendo as linhas de alocação
+        onde o funcionário selecionado corresponde ao nome_removido.
+        """
         for lote_data in self.lote_widgets.values():
             if "disciplinas" in lote_data:
+                # Itera sobre uma cópia da lista [:] para permitir a remoção segura
                 for disc_widgets in lote_data["disciplinas"].values():
                     for aloc_widget in disc_widgets["alocacoes_widgets"][:]:
+                        if not aloc_widget["frame"].winfo_exists():
+                            continue
+
+                        # --- LÓGICA DE COMPARAÇÃO SIMPLIFICADA E CORRIGIDA ---
+                        # Compara diretamente o valor do combobox com o nome a ser removido.
                         if (
-                            aloc_widget["frame"].winfo_exists()
-                            and aloc_widget.get("type") == "equipe"
-                            # A comparação agora deve reconstruir a string completa
-                            and f"{aloc_widget['combo'].get()} [{disc_widgets['frame'].cget('text')}]"
-                            == display_string
+                            aloc_widget.get("combo_nome")
+                            and aloc_widget["combo_nome"].get() == nome_removido
                         ):
                             aloc_widget["frame"].destroy()
                             disc_widgets["alocacoes_widgets"].remove(aloc_widget)
-        self.processar_calculo()
+                        # --- FIM DA LÓGICA ---
+
+        self.processar_calculo()  # Recalcula para atualizar os dashboards
 
     def _criar_treeview(self, parent_frame):
         # ... (código inalterado)
@@ -870,30 +885,40 @@ class GuiApp(tk.Tk):
 
     # MODIFICADO: Atualiza todas as listas de forma mais inteligente.
     def atualizar_lista_funcionarios(self):
-        # ... (código inalterado, mas verificado para compatibilidade) ...
+        """
+        Atualiza a lista de funcionários na janela de gerenciamento de equipe E
+        em todos os comboboxes de alocação na tela principal, usando a lógica correta.
+        """
+        # Atualiza a janela de gerenciamento de equipe (esta parte já estava correta)
         if self.team_window and self.team_window.winfo_exists():
             self.team_window.populate_listbox()
+
+        # Itera em todos os widgets para atualizar os comboboxes de funcionário
         for lote_data in self.lote_widgets.values():
             if "disciplinas" in lote_data:
                 for disc_nome, disc_widgets in lote_data["disciplinas"].items():
+
+                    # --- INÍCIO DA CORREÇÃO ---
+                    # Usa a função de busca correta, que entende o mapeamento
                     funcionarios_filtrados = (
-                        self.app_controller.get_nomes_funcionarios_por_disciplina(
-                            disc_nome
-                        )
+                        self.app_controller.get_funcionarios_para_tarefa(disc_nome)
                     )
+                    # --- FIM DA CORREÇÃO ---
+
+                    # O resto da lógica para atualizar os widgets permanece o mesmo
                     for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
-                        if (
-                            aloc_widget.get("combo_nome")
-                            and aloc_widget["combo_nome"].winfo_exists()
-                        ):
-                            selecao_atual = aloc_widget["combo_nome"].get()
-                            aloc_widget["combo_nome"].config(
-                                values=[""] + funcionarios_filtrados
-                            )
+                        combo = aloc_widget.get("combo_nome")
+                        if combo and combo.winfo_exists():
+                            selecao_atual = combo.get()
+                            # A nova lista de valores agora está correta
+                            combo.config(values=[""] + sorted(funcionarios_filtrados))
+
+                            # Tenta manter a seleção do usuário se ela ainda for válida
                             if selecao_atual in funcionarios_filtrados:
-                                aloc_widget["combo_nome"].set(selecao_atual)
+                                combo.set(selecao_atual)
                             else:
-                                aloc_widget["combo_nome"].set("")
+                                # Se o funcionário selecionado não pertence mais a esta tarefa, limpa o campo
+                                combo.set("")
 
     def _atualizar_opcoes_funcionarios(
         self, lote_nome, disciplina_alvo, combobox_clicada
@@ -1025,17 +1050,18 @@ class GuiApp(tk.Tk):
             "alocacoes_widgets"
         ].append(aloc_widget_dict)
 
-    def _criar_botao_adicionar_subcontrato(self, parent_frame, lote_nome):
-        """Cria e posiciona o botão '+ Adicionar Subcontrato' no final do frame pai."""
+    def _criar_botao_adicionar_tarefa(self, parent_frame, lote_nome):
+        """Cria e posiciona o botão '+ Adicionar Tarefa' no final do frame pai."""
         add_button_frame = ttk.Frame(parent_frame)
         add_button_frame.pack(fill=tk.X, padx=10, pady=20)
 
-        cmd = partial(
-            self._abrir_dialogo_adicionar_subcontrato, lote_nome, parent_frame
-        )
+        # O comando agora chama a nova função de diálogo genérica
+        cmd = partial(self._abrir_dialogo_adicionar_tarefa, lote_nome, parent_frame)
+
+        # O texto do botão também foi generalizado
         ttk.Button(
             add_button_frame,
-            text="+ Adicionar Subcontrato",
+            text="+ Adicionar Tarefa",
             command=cmd,
             style="Accent.TButton",
         ).pack()
@@ -1309,7 +1335,7 @@ class GuiApp(tk.Tk):
                             nova_aloc["entry"].insert(0, str(horas).replace(".", ","))
 
                     # NOVO: Adiciona o botão APÓS recriar todas as tarefas do lote
-                    self._criar_botao_adicionar_subcontrato(parent_frame, lote_nome)
+                    self._criar_botao_adicionar_tarefa(parent_frame, lote_nome)
 
             print("Estado carregado com sucesso.")
             self.processar_calculo()
@@ -1484,7 +1510,7 @@ class GuiApp(tk.Tk):
                 )
 
             # Adiciona o botão APÓS as disciplinas padrão
-            self._criar_botao_adicionar_subcontrato(scrollable_frame, lote_nome)
+            self._criar_botao_adicionar_tarefa(scrollable_frame, lote_nome)
 
         # Adicionamos um retorno para que a função de carregamento possa obter a referência ao frame
         return scrollable_frame

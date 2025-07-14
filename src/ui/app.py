@@ -4,6 +4,7 @@ from config.settings import (
     CARGOS,
     DISCIPLINAS,
     MAPEAMENTO_TAREFA_DISCIPLINA,
+    OUTROS,
     SUBCONTRATOS,
 )
 from core.project import Portfolio
@@ -75,24 +76,35 @@ class App:
         # Retorna o resultado decodificado e formatado
         return resultado_bytes.decode("utf-8").strip().upper()
 
+    # Em app.py, dentro da classe App
+
     def get_funcionarios_para_tarefa(self, nome_da_tarefa):
         """
-        Retorna uma lista de funcionários qualificados para uma tarefa específica,
-        usando o novo dicionário de mapeamento.
+        Retorna uma lista de funcionários qualificados para uma tarefa, usando
+        um mapeamento BIDIRECIONAL.
         """
-        disciplinas_de_origem = []
+        # 1. Começa com um conjunto (set) que inclui a própria tarefa como uma disciplina válida.
+        disciplinas_relacionadas = {nome_da_tarefa}
 
-        # 1. Verifica se a tarefa possui um mapeamento customizado
-        if nome_da_tarefa in MAPEAMENTO_TAREFA_DISCIPLINA:
-            disciplinas_de_origem = MAPEAMENTO_TAREFA_DISCIPLINA[nome_da_tarefa]
-        else:
-            # 2. Se não houver mapa, usa o comportamento padrão: o nome da tarefa é a disciplina
-            disciplinas_de_origem = [nome_da_tarefa]
+        # 2. Itera sobre o mapa para encontrar todas as relações (nos dois sentidos).
+        for tarefa_mapeada, disciplinas_fonte in MAPEAMENTO_TAREFA_DISCIPLINA.items():
+            # Normaliza os nomes para comparação insensível a maiúsculas/minúsculas
+            tarefa_mapeada_lower = tarefa_mapeada.lower()
+            disciplinas_fonte_lower = [d.lower() for d in disciplinas_fonte]
+            nome_da_tarefa_lower = nome_da_tarefa.lower()
 
-        # 3. Coleta os funcionários de todas as disciplinas de origem encontradas
+            # LÓGICA BIDIRECIONAL:
+            # a) Se a tarefa atual é a CHAVE do mapa, adicione as disciplinas da DIREITA.
+            if tarefa_mapeada_lower == nome_da_tarefa_lower:
+                disciplinas_relacionadas.update(disciplinas_fonte)
+
+            # b) Se a tarefa atual está na LISTA da direita, adicione a CHAVE da esquerda.
+            if nome_da_tarefa_lower in disciplinas_fonte_lower:
+                disciplinas_relacionadas.add(tarefa_mapeada)
+
+        # 3. Agora que temos todas as disciplinas relacionadas, coletamos os funcionários.
         funcionarios_qualificados = set()
-        for disciplina in disciplinas_de_origem:
-            # Reutiliza a função que já tínhamos para pegar funcionários por disciplina
+        for disciplina in disciplinas_relacionadas:
             funcionarios_encontrados = self.get_nomes_funcionarios_por_disciplina(
                 disciplina
             )
@@ -119,8 +131,10 @@ class App:
     def get_cargos_disponiveis(self):
         return sorted(list(CARGOS.values()), reverse=True)
 
-    def get_subcontratos_disponiveis(self):
-        return sorted(list(SUBCONTRATOS.values()))
+    def get_tarefas_adicionais_disponiveis(self):
+        """Combina as listas de SUBCONTRATOS e OUTROS em uma única lista de tarefas adicionáveis."""
+        tarefas = list(SUBCONTRATOS.values()) + list(OUTROS.values())
+        return sorted(tarefas)
 
     def get_ultimo_df_consolidado(self):
         return self.ultimo_df_consolidado

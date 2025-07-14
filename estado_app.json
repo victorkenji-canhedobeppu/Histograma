@@ -3,16 +3,7 @@
         "horas_mes": 160,
         "num_lotes": 1
     },
-    "funcionarios": [
-        [
-            "teste",
-            "Coordenação"
-        ],
-        [
-            "teste1",
-            "Geometria"
-        ]
-    ],
+    "funcionarios": [],
     "lotes": [
         {
             "nome": "1",
@@ -68,8 +59,8 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "Eng. Sênior",
-                                "Eng. Sênior"
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
                             ],
                             "horas_totais": 0.0
                         },
@@ -82,8 +73,8 @@
                         },
                         {
                             "funcionario": [
-                                "Coordenador",
-                                "Coordenador"
+                                "Eng. Pleno",
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 0.0
                         },
@@ -197,8 +188,8 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "Eng. Sênior",
-                                "Eng. Sênior"
+                                "Estagiário/Projetista",
+                                "Estagiário/Projetista"
                             ],
                             "horas_totais": 0.0
                         },
@@ -232,7 +223,7 @@
                         }
                     ]
                 },
-                "Estudos Gelógios-Geotécnicos": {
+                "Estudos Geológicos-Geotécnicos": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
@@ -304,8 +295,8 @@
                         },
                         {
                             "funcionario": [
-                                "Coordenador",
-                                "Coordenador"
+                                "Eng. Júnior",
+                                "Eng. Júnior"
                             ],
                             "horas_totais": 0.0
                         },
@@ -363,8 +354,8 @@
                 },
                 "Geometria": {
                     "cronograma": {
-                        "inicio": "01/01/2024",
-                        "fim": "01/02/2024"
+                        "inicio": "",
+                        "fim": ""
                     },
                     "alocacoes": [
                         {
@@ -372,35 +363,35 @@
                                 "Estagiário/Projetista",
                                 "Estagiário/Projetista"
                             ],
-                            "horas_totais": 320.0
+                            "horas_totais": 0.0
                         },
                         {
                             "funcionario": [
                                 "Eng. Sênior",
                                 "Eng. Sênior"
                             ],
-                            "horas_totais": 320.0
+                            "horas_totais": 0.0
                         },
                         {
                             "funcionario": [
                                 "Eng. Pleno",
                                 "Eng. Pleno"
                             ],
-                            "horas_totais": 320.0
+                            "horas_totais": 0.0
                         },
                         {
                             "funcionario": [
-                                "teste1",
+                                "Eng. Júnior",
                                 "Eng. Júnior"
                             ],
-                            "horas_totais": 320.0
+                            "horas_totais": 0.0
                         },
                         {
                             "funcionario": [
                                 "Coordenador",
                                 "Coordenador"
                             ],
-                            "horas_totais": 320.0
+                            "horas_totais": 0.0
                         }
                     ]
                 },
@@ -619,7 +610,7 @@
                         }
                     ]
                 },
-                "Passarelas e pedestres": {
+                "Passarelas e de Pedestres": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
@@ -734,8 +725,8 @@
                         },
                         {
                             "funcionario": [
-                                "Eng. Júnior",
-                                "Eng. Júnior"
+                                "Coordenador",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         },
@@ -799,15 +790,15 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "Estagiário/Projetista",
-                                "Estagiário/Projetista"
+                                "Eng. Sênior",
+                                "Eng. Sênior"
                             ],
                             "horas_totais": 0.0
                         },
                         {
                             "funcionario": [
-                                "Eng. Sênior",
-                                "Eng. Sênior"
+                                "Eng. Pleno",
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 0.0
                         },
