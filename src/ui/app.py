@@ -3,6 +3,7 @@
 from config.settings import (
     CARGOS,
     DISCIPLINAS,
+    LISTA_TAREFAS_GERAIS,
     MAPEAMENTO_TAREFA_DISCIPLINA,
     OUTROS,
     SUBCONTRATOS,
@@ -80,38 +81,48 @@ class App:
 
     def get_funcionarios_para_tarefa(self, nome_da_tarefa):
         """
-        Retorna uma lista de funcionários qualificados para uma tarefa, usando
-        um mapeamento BIDIRECIONAL.
+        Retorna a lista de funcionários correta para uma tarefa, seguindo uma hierarquia de regras:
+        1. Tarefas GERAIS (da lista OUTROS ou customizadas) podem ter qualquer funcionário.
+        2. Tarefas MAPEADAS seguem as regras de mapeamento.
+        3. Disciplinas PADRÃO só podem ter funcionários da própria disciplina.
         """
-        # 1. Começa com um conjunto (set) que inclui a própria tarefa como uma disciplina válida.
-        disciplinas_relacionadas = {nome_da_tarefa}
+        # REGRA 1: A tarefa é uma tarefa "Geral" predefinida da lista OUTROS?
+        # Usamos lower() para garantir a comparação correta.
+        if nome_da_tarefa.lower() in [t.lower() for t in LISTA_TAREFAS_GERAIS]:
+            return self.get_todos_os_funcionarios()
 
-        # 2. Itera sobre o mapa para encontrar todas as relações (nos dois sentidos).
+        # REGRA 2: A tarefa tem alguma relação (direta ou inversa) no mapa de competências?
+        disciplinas_relacionadas = set()
+        mapeamento_encontrado = False
         for tarefa_mapeada, disciplinas_fonte in MAPEAMENTO_TAREFA_DISCIPLINA.items():
-            # Normaliza os nomes para comparação insensível a maiúsculas/minúsculas
-            tarefa_mapeada_lower = tarefa_mapeada.lower()
-            disciplinas_fonte_lower = [d.lower() for d in disciplinas_fonte]
-            nome_da_tarefa_lower = nome_da_tarefa.lower()
-
-            # LÓGICA BIDIRECIONAL:
-            # a) Se a tarefa atual é a CHAVE do mapa, adicione as disciplinas da DIREITA.
-            if tarefa_mapeada_lower == nome_da_tarefa_lower:
+            if tarefa_mapeada.lower() == nome_da_tarefa.lower():
                 disciplinas_relacionadas.update(disciplinas_fonte)
+                mapeamento_encontrado = True
 
-            # b) Se a tarefa atual está na LISTA da direita, adicione a CHAVE da esquerda.
-            if nome_da_tarefa_lower in disciplinas_fonte_lower:
+            if nome_da_tarefa.lower() in [d.lower() for d in disciplinas_fonte]:
                 disciplinas_relacionadas.add(tarefa_mapeada)
+                mapeamento_encontrado = True
 
-        # 3. Agora que temos todas as disciplinas relacionadas, coletamos os funcionários.
-        funcionarios_qualificados = set()
-        for disciplina in disciplinas_relacionadas:
-            funcionarios_encontrados = self.get_nomes_funcionarios_por_disciplina(
-                disciplina
-            )
-            for func in funcionarios_encontrados:
-                funcionarios_qualificados.add(func)
+        if mapeamento_encontrado:
+            # Adiciona a própria tarefa como uma fonte válida
+            disciplinas_relacionadas.add(nome_da_tarefa)
 
-        return sorted(list(funcionarios_qualificados))
+            funcionarios_qualificados = set()
+            for disciplina in disciplinas_relacionadas:
+                funcionarios_encontrados = self.get_nomes_funcionarios_por_disciplina(
+                    disciplina
+                )
+                funcionarios_qualificados.update(funcionarios_encontrados)
+            return sorted(list(funcionarios_qualificados))
+
+        # REGRA 3: Se não se encaixa nas regras acima, é uma disciplina padrão ou uma tarefa customizada?
+        # Se for uma disciplina padrão (ex: "Terraplenagem"), filtra por ela mesma.
+        if nome_da_tarefa in list(DISCIPLINAS.values()):
+            return self.get_nomes_funcionarios_por_disciplina(nome_da_tarefa)
+
+        # REGRA 4 (FALLBACK): Se não é NADA acima, deve ser uma tarefa customizada ("Outros...").
+        # Nesse caso, permite todos os funcionários.
+        return self.get_todos_os_funcionarios()
 
     def get_resumo_equipe_df(self):
         """Garante que os dados mais recentes da UI estão no portfólio e retorna o resumo."""
@@ -133,7 +144,8 @@ class App:
 
     def get_tarefas_adicionais_disponiveis(self):
         """Combina as listas de SUBCONTRATOS e OUTROS em uma única lista de tarefas adicionáveis."""
-        tarefas = list(SUBCONTRATOS.values()) + list(OUTROS.values())
+        # Adiciona a opção "Outros..." no final da lista
+        tarefas = list(SUBCONTRATOS.values()) + list(OUTROS.values()) + ["Outros..."]
         return sorted(tarefas)
 
     def get_ultimo_df_consolidado(self):
@@ -256,3 +268,7 @@ class App:
         self.funcionarios.clear()
         # Chama a função da UI para garantir que a janela "Gerenciar Equipe" também seja limpa se estiver aberta.
         self.ui.atualizar_lista_funcionarios()
+
+    def get_todos_os_funcionarios(self):
+        """Retorna uma lista com o nome de todos os funcionários cadastrados."""
+        return sorted([nome for nome, disciplina in self.funcionarios])

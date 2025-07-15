@@ -1,0 +1,147 @@
+{
+    "lotes": [
+        {
+            "nome": "1",
+            "disciplinas": {
+                "Coordenação": {
+                    "cronograma": {
+                        "inicio": "01/08/2025",
+                        "fim": "15/07/2026"
+                    },
+                    "alocacoes": []
+                },
+                "Desapropriação": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Drenagem": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estruturas": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estudo de Alternativa": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estudos Geológicos-Geotécnicos": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estudos Hidrológicos": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geologia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geometria": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geotecnia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Interferência": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Obras Complementares": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Paisagismo": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Parada de Ônibus": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Passarelas e de Pedestres": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Pavimento": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Sinalização": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Terraplenagem": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Topografia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                }
+            }
+        }
+    ],
+    "config": {
+        "horas_mes": 160,
+        "num_lotes": 1
+    },
+    "funcionarios": []
+}

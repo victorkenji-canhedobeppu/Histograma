@@ -2,6 +2,7 @@
 
 import pandas as pd
 import tkinter as tk
+import tkinter.font as tkFont
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -11,12 +12,22 @@ from openpyxl.chart.layout import Layout, ManualLayout
 from openpyxl.chart.label import DataLabelList
 from openpyxl.drawing.line import LineProperties
 from openpyxl.drawing.colors import SchemeColor
+from openpyxl.drawing.fill import SolidColorFillProperties
+from openpyxl.chart.shapes import GraphicalProperties
+from openpyxl.drawing.fill import (
+    GradientFillProperties,
+    GradientStop,
+    LinearShadeProperties,
+)
+from openpyxl.drawing.geometry import Bevel, Shape3D
 
 # from openpyxl.drawing.fill import SolidColorFill
 from openpyxl.chart.shapes import GraphicalProperties
 import datetime
 import openpyxl
 from functools import partial
+from datetime import datetime as datetimeFootHolder
+import traceback
 import json
 import os
 
@@ -219,6 +230,22 @@ class GuiApp(tk.Tk):
         self._is_formatting_date = False
         self._is_loading = False
 
+        current_year = datetimeFootHolder.now().year
+        footer_text = f"© {current_year} Canhedo Beppu Engenheiros Associados LTDA - Todos os direitos reservados."
+
+        # 2. Cria o Frame do rodapé com um estilo sutil
+        footer_frame = ttk.Frame(self, style="Card.TFrame", padding=(10, 5))
+        footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(2, 0), padx=2)
+
+        # 3. Cria o Label do rodapé e o posiciona
+        footer_label = ttk.Label(
+            footer_frame,
+            text=footer_text,
+            font=("Segoe UI", 8),
+            foreground="#6c757d",  # Cor de texto cinza escuro
+        )
+        footer_label.pack()
+
         main_frame = ttk.Frame(self, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.grid_rowconfigure(0, weight=1)
@@ -241,10 +268,8 @@ class GuiApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     def _abrir_dialogo_adicionar_tarefa(self, lote_nome, parent_frame):
-        """Abre um diálogo para o usuário selecionar e adicionar uma nova tarefa (Subcontrato ou Outros)."""
-        # Chama o novo método do controlador que retorna a lista unificada
+        """Abre um diálogo para o usuário selecionar uma tarefa ou criar uma nova."""
         todas_as_tarefas_add = self.app_controller.get_tarefas_adicionais_disponiveis()
-
         tarefas_ja_adicionadas = self.app_controller.get_tarefas_ja_adicionadas(
             lote_nome
         )
@@ -262,11 +287,38 @@ class GuiApp(tk.Tk):
             return
 
         dialog = SelecionarTarefaDialog(self, "Adicionar Tarefa", tarefas_disponiveis)
-        nova_tarefa = dialog.resultado
+        tarefa_selecionada = dialog.resultado
 
-        if nova_tarefa:
+        # Se o usuário cancelou a primeira janela, não faz nada
+        if not tarefa_selecionada:
+            return
+
+        # --- INÍCIO DA NOVA LÓGICA ---
+        nova_tarefa_final = None
+        if tarefa_selecionada == "Outros...":
+            # Se selecionou "Outros...", pede um nome customizado
+            nome_customizado = simpledialog.askstring(
+                "Nome da Tarefa", "Digite o nome para a nova tarefa:", parent=self
+            )
+            # Verifica se o usuário digitou algo e se o nome já não existe
+            if nome_customizado and nome_customizado.strip():
+                if nome_customizado in tarefas_ja_adicionadas:
+                    messagebox.showwarning(
+                        "Nome Duplicado",
+                        "Uma tarefa com este nome já existe neste lote.",
+                        parent=self,
+                    )
+                else:
+                    nova_tarefa_final = nome_customizado.strip()
+        else:
+            # Se selecionou uma tarefa da lista, usa ela
+            nova_tarefa_final = tarefa_selecionada
+        # --- FIM DA NOVA LÓGICA ---
+
+        # Cria o frame apenas se um nome de tarefa válido foi definido
+        if nova_tarefa_final:
             self._criar_frame_tarefa(
-                parent_frame, lote_nome, nova_tarefa, popular_defaults=True
+                parent_frame, lote_nome, nova_tarefa_final, popular_defaults=True
             )
 
     def _on_data_keyrelease(self, event):
@@ -608,13 +660,13 @@ class GuiApp(tk.Tk):
         ws.sheet_view.showGridLines = False
 
         # --- ESTILOS PADRONIZADOS ---
-        header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+        header_font = Font(name="Arial", bold=True, color="000000", size=11)
         header_fill = PatternFill(
-            start_color="44546A", end_color="44546A", fill_type="solid"
+            start_color="E68A00", end_color="E68A00", fill_type="solid"
         )
         category_font = Font(name="Arial", bold=True, size=12)
         category_fill = PatternFill(
-            start_color="DDEBF7", end_color="DDEBF7", fill_type="solid"
+            start_color="E6AF60", end_color="E6AF60", fill_type="solid"
         )
         data_font = Font(name="Arial", size=10)
         thin_side = Side(border_style="thin", color="BFBFBF")
@@ -938,39 +990,25 @@ class GuiApp(tk.Tk):
     # MODIFICADO: Atualiza todas as listas de forma mais inteligente.
     def atualizar_lista_funcionarios(self):
         """
-        Atualiza a lista de funcionários na janela de gerenciamento de equipe E
-        em todos os comboboxes de alocação na tela principal, usando a lógica correta.
+        Atualiza TODAS as listas de funcionários na tela e na janela de equipe.
         """
-        # Atualiza a janela de gerenciamento de equipe (esta parte já estava correta)
+        # Atualiza a janela "Gerenciar Equipe"
         if self.team_window and self.team_window.winfo_exists():
             self.team_window.populate_listbox()
 
-        # Itera em todos os widgets para atualizar os comboboxes de funcionário
+        # Itera sobre todos os widgets de alocação existentes na tela
         for lote_data in self.lote_widgets.values():
             if "disciplinas" in lote_data:
-                for disc_nome, disc_widgets in lote_data["disciplinas"].items():
-
-                    # --- INÍCIO DA CORREÇÃO ---
-                    # Usa a função de busca correta, que entende o mapeamento
-                    funcionarios_filtrados = (
-                        self.app_controller.get_funcionarios_para_tarefa(disc_nome)
-                    )
-                    # --- FIM DA CORREÇÃO ---
-
-                    # O resto da lógica para atualizar os widgets permanece o mesmo
+                for nome_da_tarefa, disc_widgets in lote_data["disciplinas"].items():
                     for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
-                        combo = aloc_widget.get("combo_nome")
-                        if combo and combo.winfo_exists():
-                            selecao_atual = combo.get()
-                            # A nova lista de valores agora está correta
-                            combo.config(values=[""] + sorted(funcionarios_filtrados))
+                        combobox_func = aloc_widget.get("combo_nome")
 
-                            # Tenta manter a seleção do usuário se ela ainda for válida
-                            if selecao_atual in funcionarios_filtrados:
-                                combo.set(selecao_atual)
-                            else:
-                                # Se o funcionário selecionado não pertence mais a esta tarefa, limpa o campo
-                                combo.set("")
+                        # Para cada combobox, chama a mesma função mestre para garantir
+                        # que ele tenha a lista de valores mais recente e correta.
+                        if combobox_func:
+                            self._atualizar_valores_combobox_funcionario(
+                                combobox_func, nome_da_tarefa
+                            )
 
     def _atualizar_opcoes_funcionarios(
         self, lote_nome, disciplina_alvo, combobox_clicada
@@ -1035,25 +1073,19 @@ class GuiApp(tk.Tk):
     def adicionar_alocacao_equipe(
         self, lote_nome, disciplina, cargo_a_definir=None, horas_a_definir=None
     ):
+        # Pega o frame pai para esta disciplina
         frame = self.lote_widgets[lote_nome]["disciplinas"][disciplina][
             "alocacoes_frame"
         ]
+        # Cria a linha para todos os widgets
         row_frame = ttk.Frame(frame)
         row_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(row_frame, text="Funcionário:").pack(side=tk.LEFT, padx=(0, 5))
-        nomes_funcionarios = self.app_controller.get_funcionarios_para_tarefa(
-            disciplina
-        )
-        combo_nome = ttk.Combobox(
-            row_frame,
-            values=[""] + sorted(nomes_funcionarios),
-            state="readonly",
-            width=25,
-        )
-        combo_nome.pack(side=tk.LEFT, padx=(0, 10))
-        combo_nome.set("")
 
-        # NOVO: Associa o clique do mouse à função de atualização da lista
+        # --- Criação dos Widgets de Dados ---
+        ttk.Label(row_frame, text="Funcionário:").pack(side=tk.LEFT, padx=(0, 5))
+        combo_nome = ttk.Combobox(row_frame, state="readonly", width=25)
+        combo_nome.pack(side=tk.LEFT, padx=(0, 10))
+
         ttk.Label(row_frame, text="Cargo:").pack(side=tk.LEFT, padx=(0, 5))
         cargos_disponiveis = self.app_controller.get_cargos_disponiveis()
         combo_cargo = ttk.Combobox(
@@ -1070,9 +1102,11 @@ class GuiApp(tk.Tk):
         if horas_a_definir is not None:
             entry.insert(0, f"{horas_a_definir:.2f}".replace(".", ","))
 
+        # --- Criação dos Botões de Ação (Remover e Dividir) ---
         action_buttons_frame = ttk.Frame(row_frame)
         action_buttons_frame.pack(side=tk.RIGHT, padx=(10, 0))
 
+        # Dicionário que armazena todos os widgets da linha
         aloc_widget_dict = {
             "type": "equipe",
             "combo_nome": combo_nome,
@@ -1082,25 +1116,32 @@ class GuiApp(tk.Tk):
             "disciplina": disciplina,
         }
 
-        dividir_cmd = partial(
-            self.dividir_tarefa, lote_nome, disciplina, aloc_widget_dict
-        )
-        dividir_btn = ttk.Button(
-            action_buttons_frame, text="Dividir", width=7, command=dividir_cmd
-        )
-        dividir_btn.pack(side=tk.LEFT, padx=(0, 8))
-
+        # Botão de Remover (X)
         remove_cmd = partial(
             self._remover_linha_alocacao, lote_nome, disciplina, aloc_widget_dict
         )
         remove_btn = ttk.Button(
             action_buttons_frame, text="X", width=3, command=remove_cmd
         )
-        remove_btn.pack(side=tk.LEFT, padx=(0, 0))
+        remove_btn.pack(side=tk.LEFT, padx=(0, 2))
 
+        # Botão de Dividir
+        dividir_cmd = partial(
+            self.dividir_tarefa, lote_nome, disciplina, aloc_widget_dict
+        )
+        dividir_btn = ttk.Button(
+            action_buttons_frame, text="Dividir", width=7, command=dividir_cmd
+        )
+        dividir_btn.pack(side=tk.LEFT, padx=(5, 0))
+
+        # Adiciona o dicionário de widgets à lista principal
         self.lote_widgets[lote_nome]["disciplinas"][disciplina][
             "alocacoes_widgets"
         ].append(aloc_widget_dict)
+
+        # --- Lógica de Atualização Centralizada ---
+        # No final, chama a função mestre para popular o combobox de funcionário
+        self._atualizar_valores_combobox_funcionario(combo_nome, disciplina)
 
     def _criar_botao_adicionar_tarefa(self, parent_frame, lote_nome):
         """Cria e posiciona o botão '+ Adicionar Tarefa' no final do frame pai."""
@@ -1253,58 +1294,47 @@ class GuiApp(tk.Tk):
             pass
 
     def _coletar_dados_da_ui(self):
+        """
+        Coleta TODOS os dados inseridos pelo usuário na interface e os retorna em um dicionário estruturado.
+        Esta função APENAS LÊ, não modifica a UI.
+        """
         try:
-            estado_geral = {
-                "config": {
-                    "horas_mes": int(self.horas_mes_entry.get() or 160),
-                    "num_lotes": int(self.num_lotes_entry.get() or 0),
-                },
-                "funcionarios": self.app_controller.funcionarios,
-                "lotes": [],
-            }
+            dados = {"lotes": [], "config": {}, "funcionarios": []}
+            dados["config"]["horas_mes"] = int(self.horas_mes_entry.get())
+            dados["config"]["num_lotes"] = int(self.num_lotes_entry.get())
+            dados["funcionarios"] = self.app_controller.funcionarios
 
             for lote_nome, lote_data in self.lote_widgets.items():
                 lote_dict = {"nome": lote_nome, "disciplinas": {}}
+                for disc_nome, disc_widgets in lote_data.get("disciplinas", {}).items():
+                    disc_dict = {"cronograma": {}, "alocacoes": []}
 
-                # A chave "disciplinas" agora contém todas as tarefas (disciplinas e subcontratos)
-                if "disciplinas" in lote_data:
-                    for tarefa_nome, tarefa_widgets in lote_data["disciplinas"].items():
-                        tarefa_dict = {
-                            "cronograma": {
-                                "inicio": tarefa_widgets["start_date"].get(),
-                                "fim": tarefa_widgets["end_date"].get(),
-                            },
-                            "alocacoes": [],
-                        }
+                    # Coleta cronograma
+                    disc_dict["cronograma"]["inicio"] = disc_widgets["start_date"].get()
+                    disc_dict["cronograma"]["fim"] = disc_widgets["end_date"].get()
 
-                        for aloc_widget in tarefa_widgets["alocacoes_widgets"]:
-                            if aloc_widget["frame"].winfo_exists():
-                                horas_str = (
-                                    aloc_widget["entry"].get().strip().replace(",", ".")
-                                )
-                                cargo_func = aloc_widget["combo_cargo"].get()
-                                nome_func = aloc_widget["combo_nome"].get().strip()
+                    # Coleta alocações
+                    for aloc_widget in disc_widgets.get("alocacoes_widgets", []):
+                        nome = aloc_widget["combo_nome"].get()
+                        cargo = aloc_widget["combo_cargo"].get()
+                        horas_str = aloc_widget["entry"].get().replace(",", ".")
 
-                                # Mantém a lógica de salvamento
-                                nome_a_salvar = nome_func or cargo_func
-                                if nome_a_salvar:
-                                    try:
-                                        horas_float = float(horas_str or 0.0)
-                                    except ValueError:
-                                        horas_float = 0.0
+                        if nome and cargo and horas_str:
+                            horas = float(horas_str)
+                            aloc_dict = {
+                                "funcionario": [nome, cargo],
+                                "horas_totais": horas,
+                            }
+                            disc_dict["alocacoes"].append(aloc_dict)
 
-                                    tarefa_dict["alocacoes"].append(
-                                        {
-                                            "funcionario": (nome_a_salvar, cargo_func),
-                                            "horas_totais": horas_float,
-                                        }
-                                    )
-                        lote_dict["disciplinas"][tarefa_nome] = tarefa_dict
-                estado_geral["lotes"].append(lote_dict)
-            return estado_geral
-        except Exception as e:
+                    lote_dict["disciplinas"][disc_nome] = disc_dict
+                dados["lotes"].append(lote_dict)
+            return dados
+        except (ValueError, KeyError) as e:
             messagebox.showerror(
-                "Erro de Coleta", f"Ocorreu um erro ao ler os dados para salvar: {e}"
+                "Erro de Entrada",
+                f"Por favor, verifique os dados inseridos. Erro: {e}",
+                parent=self,
             )
             return None
 
@@ -1322,95 +1352,155 @@ class GuiApp(tk.Tk):
 
     # MODIFICADO: Carrega o estado e recria as alocações corretamente.
 
+    # Em gui_app.py, substitua esta função
     def carregar_ou_iniciar_ui(self):
+        """
+        Tenta carregar o estado do arquivo JSON. Se conseguir, manda para a função de renderização.
+        """
         if not os.path.exists(ESTADO_APP_FILE):
-            print(
-                "Nenhum estado salvo encontrado. Aguardando geração de lotes pelo usuário."
-            )
+            print("Nenhum estado salvo encontrado. Iniciando com UI padrão.")
+            self.gerar_abas_lotes()  # Apenas gera a UI padrão
             return
 
-        self._is_loading = True
         try:
             with open(ESTADO_APP_FILE, "r", encoding="utf-8") as f:
                 estado = json.load(f)
 
-            # Carrega configs e funcionários
-            config = estado.get("config", {})
-            self.horas_mes_entry.delete(0, tk.END)
-            self.horas_mes_entry.insert(0, config.get("horas_mes", 160))
-            self.num_lotes_entry.delete(0, tk.END)
-            self.num_lotes_entry.insert(0, config.get("num_lotes", 1))
-
+            # Carrega os funcionários no controlador
             for func_data in estado.get("funcionarios", []):
-                if isinstance(func_data, list) and len(func_data) == 2:
-                    self.app_controller.adicionar_funcionario(*func_data)
+                self.app_controller.adicionar_funcionario(*func_data)
 
-            # Gera as abas de lotes, mas SEM popular o conteúdo ainda
-            self.gerar_abas_lotes(popular_defaults=False)
-
-            # Reconstrói o estado de CADA lote
-            for lote_data in estado.get("lotes", []):
-                lote_nome = lote_data.get("nome")
-                if lote_nome in self.lote_widgets:
-                    # CORREÇÃO: Pega o scrollable_frame que foi salvo no dicionário de widgets
-                    parent_frame = self.lote_widgets[lote_nome].get("scrollable_frame")
-                    if not parent_frame:
-                        continue
-
-                    # Itera sobre TODAS as tarefas salvas para recriá-las
-                    for tarefa_nome, tarefa_data in lote_data.get(
-                        "disciplinas", {}
-                    ).items():
-                        self._criar_frame_tarefa(
-                            parent_frame, lote_nome, tarefa_nome, popular_defaults=False
-                        )
-
-                        tarefa_widgets = self.lote_widgets[lote_nome]["disciplinas"][
-                            tarefa_nome
-                        ]
-                        cronograma = tarefa_data.get("cronograma", {})
-                        tarefa_widgets["start_date"].insert(
-                            0, cronograma.get("inicio", "")
-                        )
-                        tarefa_widgets["end_date"].insert(0, cronograma.get("fim", ""))
-
-                        for aloc_data in tarefa_data.get("alocacoes", []):
-                            self.adicionar_alocacao_equipe(lote_nome, tarefa_nome)
-                            nova_aloc = tarefa_widgets["alocacoes_widgets"][-1]
-                            nome_func, cargo_func = aloc_data.get(
-                                "funcionario", (None, None)
-                            )
-                            horas = aloc_data.get("horas_totais", "")
-                            nova_aloc["combo_cargo"].set(cargo_func)
-                            if nome_func != cargo_func:
-                                nova_aloc["combo_nome"].set(nome_func)
-                            nova_aloc["entry"].insert(0, str(horas).replace(".", ","))
-
-                    # NOVO: Adiciona o botão APÓS recriar todas as tarefas do lote
-                    self._criar_botao_adicionar_tarefa(parent_frame, lote_nome)
+            # Manda o estado completo para a função de renderização
+            self._renderizar_estado_na_ui(estado)
 
             print("Estado carregado com sucesso.")
             self.processar_calculo()
 
         except Exception as e:
+            # Bloco de erro (inalterado)
+            import traceback
+
             messagebox.showerror(
                 "Erro ao Carregar",
                 f"Não foi possível carregar o estado salvo: {e}\n\nIniciando com uma nova sessão.",
                 parent=self,
             )
+            traceback.print_exc()
             self.lote_widgets.clear()
             for i in range(len(self.notebook.tabs()) - 1, 0, -1):
                 self.notebook.forget(i)
+            self.gerar_abas_lotes()  # Volta para a UI padrão em caso de erro
+
+    def _renderizar_estado_na_ui(self, estado_completo):
+        """
+        Função MESTRE de renderização. Pega um dicionário de 'estado' e
+        desenha/atualiza toda a interface para corresponder a ele.
+        """
+        self._is_loading = True
+        try:
+            # 1. Limpa completamente as abas de lote existentes
+            for i in range(len(self.notebook.tabs()) - 1, 0, -1):
+                self.notebook.forget(i)
+            self.lote_widgets.clear()
+
+            # 2. Renderiza as configurações gerais
+            config = estado_completo.get("config", {})
+            self.horas_mes_entry.delete(0, tk.END)
+            self.horas_mes_entry.insert(0, str(config.get("horas_mes", 160)))
+            self.num_lotes_entry.delete(0, tk.END)
+            self.num_lotes_entry.insert(0, str(config.get("num_lotes", 1)))
+
+            # 3. Recria as abas e os frames de tarefa do zero com base no estado
+            for lote_data in estado_completo.get("lotes", []):
+                lote_nome = lote_data["nome"]
+
+                # Etapa A: Cria todos os widgets da interface primeiro.
+                lote_tab_frame = ttk.Frame(self.notebook)
+                self.notebook.add(lote_tab_frame, text=f"Lote {lote_nome}")
+                lote_notebook = ttk.Notebook(lote_tab_frame)
+                lote_notebook.pack(fill=tk.BOTH, expand=True)
+                entrada_tab = ttk.Frame(lote_notebook, padding=10)
+                dashboard_lote_tab = ttk.Frame(lote_notebook, padding=5)
+                lote_notebook.add(entrada_tab, text="Entrada de Dados")
+                lote_notebook.add(dashboard_lote_tab, text="Dashboard do Lote")
+
+                dash_tree = self._criar_treeview(dashboard_lote_tab)
+                scrollable_frame = self.criar_conteudo_aba_entrada(
+                    entrada_tab, lote_nome, popular_defaults=False
+                )
+
+                # Etapa B: Agora que os widgets existem, cria a entrada no dicionário.
+                self.lote_widgets[lote_nome] = {
+                    "nome": lote_nome,
+                    "disciplinas": {},
+                    "dash_tree": dash_tree,
+                    "scrollable_frame": scrollable_frame,
+                }
+
+                # Etapa C: Popula o scrollable_frame com os dados do estado.
+                for tarefa_nome, tarefa_data in lote_data.get(
+                    "disciplinas", {}
+                ).items():
+                    self._criar_frame_tarefa(
+                        scrollable_frame, lote_nome, tarefa_nome, popular_defaults=False
+                    )
+
+                    tarefa_widgets = self.lote_widgets[lote_nome]["disciplinas"][
+                        tarefa_nome
+                    ]
+                    tarefa_widgets["start_date"].insert(
+                        0, tarefa_data.get("cronograma", {}).get("inicio", "")
+                    )
+                    tarefa_widgets["end_date"].insert(
+                        0, tarefa_data.get("cronograma", {}).get("fim", "")
+                    )
+
+                    for aloc_data in tarefa_data.get("alocacoes", []):
+                        nome_func, cargo_func = aloc_data.get(
+                            "funcionario", (None, None)
+                        )
+                        horas = aloc_data.get("horas_totais", "")
+
+                        self.adicionar_alocacao_equipe(lote_nome, tarefa_nome)
+                        nova_aloc_widgets = tarefa_widgets["alocacoes_widgets"][-1]
+
+                        # ### INÍCIO DA CORREÇÃO FINAL ###
+                        # Valida se o nome do funcionário vindo do arquivo de estado
+                        # é uma opção válida no ComboBox.
+                        opcoes_validas = nova_aloc_widgets["combo_nome"]["values"]
+
+                        if nome_func and nome_func in opcoes_validas:
+                            # Se o nome é válido, seleciona-o.
+                            nova_aloc_widgets["combo_nome"].set(nome_func)
+                        else:
+                            # Se o nome não é válido (ex: é um cargo ou não existe),
+                            # deixa o campo de funcionário vazio, como solicitado.
+                            nova_aloc_widgets["combo_nome"].set("")
+
+                        # O cargo e as horas são preenchidos normalmente para que a
+                        # alocação não seja perdida.
+                        nova_aloc_widgets["combo_cargo"].set(
+                            cargo_func if cargo_func else ""
+                        )
+                        # ### FIM DA CORREÇÃO FINAL ###
+
+                        if horas:
+                            nova_aloc_widgets["entry"].insert(
+                                0, str(horas).replace(".", ",")
+                            )
+
+                # Adiciona o botão "+ Adicionar Tarefa" no final do lote
+                self._criar_botao_adicionar_tarefa(scrollable_frame, lote_nome)
 
         finally:
+            self.update_idletasks()
             self._is_loading = False
 
     # MODIFICADO: Lógica de parsing no `processar_calculo`
     def processar_calculo(self):
         dados_coletados = self._coletar_dados_da_ui()
         if not dados_coletados:
-            return  # A mensagem de erro já foi exibida durante a coleta
-
+            return
         try:
             horas_mes = dados_coletados["config"]["horas_mes"]
             self.app_controller.processar_portfolio(dados_coletados["lotes"], horas_mes)
@@ -1421,49 +1511,47 @@ class GuiApp(tk.Tk):
 
     # ... O restante do arquivo (dividir_tarefa, exportar_para_excel, etc.) pode permanecer o mesmo por enquanto
     # ... ou ser ajustado se a função dividir tarefa precisar de lógica de categoria
-    def dividir_tarefa(self, lote_nome, disciplina, aloc_origem):
-        # A lógica de dividir tarefa pode se tornar mais complexa.
-        # Por agora, ela vai adicionar um novo funcionário (que precisa de uma categoria)
-        # e alocá-lo à mesma tarefa. A filtragem cuidará do resto.
+    def dividir_tarefa(self, lote_nome, disciplina, aloc_origem_widget):
+        """
+        Função com lógica corrigida para dividir uma tarefa.
+        Ela divide as horas e cria uma nova linha de alocação para o usuário preencher.
+        """
         try:
-            horas_originais = float(aloc_origem["entry"].get().replace(",", "."))
+            horas_str = aloc_origem_widget["entry"].get().replace(",", ".")
+            horas_originais = float(horas_str or 0.0)
+
             if horas_originais <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showwarning(
-                "Aviso",
-                "A tarefa precisa ter horas positivas para ser dividida.",
+                messagebox.showwarning(
+                    "Aviso",
+                    "A tarefa precisa ter horas positivas para ser dividida.",
+                    parent=self,
+                )
+                return
+
+            horas_divididas = horas_originais / 2.0
+
+            # Atualiza a entrada original com metade das horas
+            aloc_origem_widget["entry"].delete(0, tk.END)
+            aloc_origem_widget["entry"].insert(
+                0, f"{horas_divididas:.2f}".replace(".", ",")
+            )
+
+            # Adiciona uma nova linha de alocação com a outra metade das horas
+            # e o mesmo cargo da linha original. O usuário selecionará o funcionário.
+            cargo_original = aloc_origem_widget["combo_cargo"].get()
+            self.adicionar_alocacao_equipe(
+                lote_nome,
+                disciplina,
+                cargo_a_definir=cargo_original,
+                horas_a_definir=horas_divididas,
+            )
+
+        except (ValueError, KeyError) as e:
+            messagebox.showerror(
+                "Erro ao Dividir",
+                f"Não foi possível dividir a tarefa: {e}",
                 parent=self,
             )
-            return
-
-        # O novo funcionário será criado na mesma disciplina da tarefa atual.
-        dialog = CustomDialog(
-            self, self.app_controller.get_cargos_disponiveis(), [disciplina]
-        )
-        if not dialog.result:
-            return
-
-        novo_nome, novo_cargo, nova_disciplina = dialog.result
-        self.app_controller.adicionar_funcionario(
-            novo_nome, novo_cargo, nova_disciplina
-        )
-
-        # O novo funcionário agora aparecerá na lista filtrada.
-        self.adicionar_alocacao_equipe(lote_nome, disciplina)
-
-        nova_aloc_widget = self.lote_widgets[lote_nome]["disciplinas"][disciplina][
-            "alocacoes_widgets"
-        ][-1]
-
-        horas_divididas = horas_originais / 2.0
-        aloc_origem["entry"].delete(0, tk.END)
-        aloc_origem["entry"].insert(0, f"{horas_divididas:.2f}".replace(".", ","))
-
-        novo_display_string = f"{novo_nome} ({novo_cargo})"
-        nova_aloc_widget["combo"].set(novo_display_string)
-        nova_aloc_widget["entry"].delete(0, tk.END)
-        nova_aloc_widget["entry"].insert(0, f"{horas_divididas:.2f}".replace(".", ","))
 
     # ...
     # O restante dos métodos (gerar_abas_lotes, _preencher_treeview, atualizar_dashboards, exportar_para_excel, etc)
@@ -1566,6 +1654,30 @@ class GuiApp(tk.Tk):
 
         # Adicionamos um retorno para que a função de carregamento possa obter a referência ao frame
         return scrollable_frame
+
+    def _atualizar_valores_combobox_funcionario(self, combobox_widget, nome_da_tarefa):
+        """
+        Função centralizada para atualizar os valores de um combobox de funcionário.
+        Ela busca a lista correta de funcionários e atualiza o widget, preservando a seleção atual se possível.
+        """
+        if not combobox_widget.winfo_exists():
+            return
+
+        # Guarda a seleção atual para tentar restaurá-la depois
+        selecao_atual = combobox_widget.get()
+
+        # 1. Busca a lista de nomes correta e sem duplicatas usando a lógica do controlador
+        lista_nomes = self.app_controller.get_funcionarios_para_tarefa(nome_da_tarefa)
+
+        # 2. Atualiza os valores do combobox, substituindo completamente a lista antiga
+        combobox_widget.config(values=[""] + sorted(lista_nomes))
+
+        # 3. Tenta restaurar a seleção anterior
+        if selecao_atual in lista_nomes:
+            combobox_widget.set(selecao_atual)
+        else:
+            # Se a seleção antiga não é mais válida para esta tarefa, limpa o campo
+            combobox_widget.set("")
 
     # A função não precisa mais retornar um dicionário
 
@@ -1719,6 +1831,8 @@ class GuiApp(tk.Tk):
         tree.delete(*tree.get_children())
         if df_relatorio.empty:
             return
+
+        # Parte 1: Configuração e preenchimento dos dados (inalterada)
         tree["columns"] = list(df_relatorio.columns)
         tree["show"] = "headings"
         tree.tag_configure("excedido", background="#ffdddd", foreground="red")
@@ -1726,30 +1840,60 @@ class GuiApp(tk.Tk):
             "header", background="#e0e0e0", font=("Segoe UI", 10, "bold")
         )
         for col in tree["columns"]:
-            tree.heading(col, text=col)
-            width = 180
-            if col == "Funcionário":
-                width = 200
-            elif col == "Disciplina":
-                width = 150
-            tree.column(col, width=width, anchor=tk.W)
-        df_sorted = df_relatorio.sort_values(by=["Disciplina", "Cargo", "Funcionário"])
-        last_disc = None
-        for _, row in df_sorted.iterrows():
-            if row["Disciplina"] != last_disc:
-                last_disc = row["Disciplina"]
-                tree.insert(
-                    "",
-                    "end",
-                    values=[last_disc.upper()] + [""] * (len(df_relatorio.columns) - 1),
-                    tags=("header",),
-                )
-            tags = (
-                ("excedido",)
-                if "Status" in row and row["Status"] == "Alocação Excedida"
-                else ()
+            # Apenas o cabeçalho continua alinhado à esquerda para um visual padrão
+            tree.heading(col, text=col, anchor=tk.CENTER)
+
+        # Lógica de preenchimento (agregado vs. detalhado)
+        if "Disciplina" in df_relatorio.columns:
+            df_sorted = df_relatorio.sort_values(
+                by=["Disciplina", "Cargo", "Funcionário"]
             )
-            tree.insert("", "end", values=list(row), tags=tags)
+            last_disc = None
+            for _, row in df_sorted.iterrows():
+                if row["Disciplina"] != last_disc:
+                    last_disc = row["Disciplina"]
+                    # A linha do cabeçalho da disciplina fica alinhada à esquerda
+                    tree.insert(
+                        "",
+                        "end",
+                        values=[last_disc.upper()]
+                        + [""] * (len(df_relatorio.columns) - 1),
+                        tags=("header",),
+                    )
+                tags = (
+                    ("excedido",)
+                    if "Status" in row and row["Status"] == "Alocação Excedida"
+                    else ()
+                )
+                tree.insert("", "end", values=list(row), tags=tags)
+        else:
+            df_sorted = df_relatorio.sort_values(by=["Funcionário"])
+            for _, row in df_sorted.iterrows():
+                tags = (
+                    ("excedido",)
+                    if "Status" in row and row["Status"] == "Alocação Excedida"
+                    else ()
+                )
+                tree.insert("", "end", values=list(row), tags=tags)
+
+        # Parte 2: Ajuste dinâmico da largura e CENTRALIZAÇÃO do conteúdo
+        font = tkFont.Font(family="Segoe UI", size=10)
+        for col in df_relatorio.columns:
+            max_width = font.measure(col)
+            for item in df_relatorio[col]:
+                cell_width = font.measure(str(item))
+                if cell_width > max_width:
+                    max_width = cell_width
+
+            final_width = (
+                max_width + 25
+            )  # Aumentado um pouco o padding para centralização
+            if final_width > 600:
+                final_width = 600
+
+            # --- MUDANÇA PRINCIPAL AQUI ---
+            # Define a largura e a âncora da coluna para o CENTRO
+            tree.column(col, width=final_width, anchor=tk.CENTER)
 
     def atualizar_dashboards(
         self,
@@ -1826,7 +1970,7 @@ class GuiApp(tk.Tk):
             defaultextension=".xlsx",
             filetypes=[("Arquivo Excel", "*.xlsx"), ("Todos os Arquivos", "*.*")],
             title="Salvar Relatório de Alocação",
-            initialfile=f"Relatorio_Alocacao_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx",
+            initialfile=f"Relatorio_Alocacao_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx",
         )
         if not filepath:
             return
@@ -1876,13 +2020,13 @@ class GuiApp(tk.Tk):
         ws.sheet_view.showGridLines = False
 
         # --- ESTILOS PADRONIZADOS ---
-        header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+        header_font = Font(name="Arial", bold=True, color="000000", size=11)
         header_fill = PatternFill(
-            start_color="44546A", end_color="44546A", fill_type="solid"
+            start_color="E68A00", end_color="E68A00", fill_type="solid"
         )
         category_font = Font(name="Arial", bold=True, size=12)
         category_fill = PatternFill(
-            start_color="DDEBF7", end_color="DDEBF7", fill_type="solid"
+            start_color="E6AF60", end_color="E6AF60", fill_type="solid"
         )  # Azul claro
         data_font = Font(name="Arial", size=10)
         thin_side = Side(border_style="thin", color="BFBFBF")
@@ -1937,6 +2081,17 @@ class GuiApp(tk.Tk):
             ws.column_dimensions[column_letter].width = max(max_len + 4, 12)
 
     def _create_chart_for_sheet(self, writer, sheet_name, df):
+        from openpyxl.chart.axis import ChartLines
+        from openpyxl.chart.text import RichText
+        from openpyxl.drawing.text import (
+            CharacterProperties,
+            Paragraph,
+            ParagraphProperties,
+            RichTextProperties,
+        )
+        from openpyxl.drawing.line import LineProperties
+        from openpyxl.drawing.fill import SolidColorFillProperties
+
         if df.empty:
             return
 
@@ -1980,14 +2135,30 @@ class GuiApp(tk.Tk):
 
         # 2. Mover o título para cima ajustando o layout da área de plotagem
         # Isso move a área do gráfico (as barras) para baixo, dando mais espaço para o título.
+        # chart.x_axis.txPr = RichText(
+        # bodyPr=RichTextProperties(
+        # rot=-450000,  # Rotação de -45 graus (multiplicado por 100000)
+        # kern=1,  # Ajuste de espaçamento (opcional, experimente)
+        # You might also need to set anchor or anchorCtr depending on exact positioning
+        # anchor="ctr", # Center anchor for the text
+        # anchorCtr=True, # Center anchor for the text
+        # ),
+        # p=[
+        # Paragraph(
+        # pPr=ParagraphProperties(defRPr=CharacterProperties()),
+        # endParaRPr=CharacterProperties(),
+        # )
+        # ],
+        # )
+
+        # 2. Mover o título para cima ajustando o layout da área de plotagem
+        # Isso move a área do gráfico (as barras) para baixo, dando mais espaço para o título.
         chart.layout = Layout(
             manualLayout=ManualLayout(
                 y=0.15,  # Posição Y da área de plotagem (15% a partir do topo)
                 h=0.75,  # Altura da área de plotagem (75% da altura total do gráfico)
             )
         )
-
-        # --- FIM DAS MODIFICAÇÕES ---
 
         data_start_col = len(df.columns) + 2
         chart_data_start_row = 2
@@ -2014,8 +2185,8 @@ class GuiApp(tk.Tk):
 
         series = Series(values, title_from_data=True)
 
-        series.graphicalProperties.solidFill = "44546A"
-        series.graphicalProperties.line.solidFill = "44546A"
+        series.graphicalProperties.solidFill = "E68A00"
+        series.graphicalProperties.line.solidFill = "E68A00"
 
         chart.append(series)
         chart.set_categories(cats)

@@ -33,7 +33,6 @@ SUBCONTRATOS = {
     "ILU": "Iluminação",
     "GEO": "Geotecnia",
     "OBA_CIV": "Obra Civil",
-    "OUTROS": "Outros",
 }
 
 OUTROS = {
@@ -45,6 +44,8 @@ OUTROS = {
     "ACS": "Acompanhamento de Sondagens",
 }
 
+LISTA_TAREFAS_GERAIS = list(OUTROS.values())
+
 
 MAPEAMENTO_TAREFA_DISCIPLINA = {
     "Estudos Geológicos-Geotécnicos": ["Geotecnia", "Geologia"],
@@ -55,6 +56,6 @@ MAPEAMENTO_TAREFA_DISCIPLINA = {
     "Paisagismo": ["Sinalização"],
     "Desapropriação": ["Geometria"],
     "Parada de Ônibus": ["Geometria"],
-    "Obras complementares": ["Sinalização"],
+    "Obras Complementares": ["Sinalização"],
     "Interferência": ["Sinalização"],
 }

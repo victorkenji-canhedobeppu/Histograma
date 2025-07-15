@@ -157,7 +157,7 @@ class Portfolio:
         # O restante da formatação do DataFrame continua igual...
         colunas_meses_numericas = [key for key in todos_meses_keys if key in df.columns]
         if colunas_meses_numericas:
-            df["H.mês"] = df[colunas_meses_numericas].sum(axis=1)
+            df["H.total"] = df[colunas_meses_numericas].sum(axis=1)
 
         meses_display_map = {
             key: datetime.strptime(key, "%Y-%m").strftime("%b/%y")
@@ -166,8 +166,8 @@ class Portfolio:
         df.rename(columns=meses_display_map, inplace=True)
 
         colunas_para_formatar = list(meses_display_map.values())
-        if "H.mês" in df.columns:
-            colunas_para_formatar.append("H.mês")
+        if "H.total" in df.columns:
+            colunas_para_formatar.append("H.total")
 
         for col in colunas_para_formatar:
             if col in df.columns:
@@ -179,8 +179,8 @@ class Portfolio:
             list(meses_display_map.values()),
             key=lambda x: datetime.strptime(x, "%b/%y"),
         )
-        if "H.mês" in df.columns:
-            colunas_finais.append("H.mês")
+        if "H.total" in df.columns:
+            colunas_finais.append("H.total")
         colunas_finais.append("Status")
 
         return df.reindex(columns=colunas_finais).fillna("")
