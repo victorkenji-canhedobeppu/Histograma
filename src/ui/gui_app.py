@@ -2731,7 +2731,6 @@ class GuiApp(tk.Tk):
 
         # If DataFrame is empty, just clear and return
         if df_relatorio.empty:
-            # print(f"DEBUG: _preencher_treeview: Received empty DataFrame for {tree}.")
             tree["columns"] = []  # Clear columns if no data
             return
 
@@ -2794,8 +2793,23 @@ class GuiApp(tk.Tk):
             if "Status" in row and row["Status"] == "Alocação Excedida":
                 tags = ("excedido",)
 
+            # Format numeric values to two decimal places with comma as separator
+            formatted_values = []
+            for col in cols:
+                value = row[col]
+                # Check if the value is numeric (int or float) and not part of the initial columns like 'Disciplina', 'Cargo', 'Funcionário'
+                if isinstance(value, (int, float)) and col not in [
+                    "Disciplina",
+                    "Cargo",
+                    "Funcionário",
+                    "Status",
+                ]:
+                    formatted_values.append(f"{value:.2f}".replace(".", ","))
+                else:
+                    formatted_values.append(value)
+
             # Insert the actual data row
-            tree.insert("", "end", values=[row[col] for col in cols], tags=tags)
+            tree.insert("", "end", values=formatted_values, tags=tags)
 
         # Ensure visibility of vertical scrollbar if content exceeds view
         tree.update_idletasks()  # Ensure sizes are calculated

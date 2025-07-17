@@ -20364,7 +20364,43 @@
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Desapropriação": {
                     "cronograma": {
@@ -20374,8 +20410,36 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "André",
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
                                 "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -20386,14 +20450,86 @@
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Estruturas": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Estudo de Alternativa": {
                     "cronograma": {
@@ -20403,8 +20539,36 @@
                     "alocacoes": [
                         {
                             "funcionario": [
-                                "André",
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
                                 "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
                             ],
                             "horas_totais": 0.0
                         }
@@ -20415,21 +20579,129 @@
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Estudos Hidrológicos": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Geologia": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Geometria": {
                     "cronograma": {
@@ -20582,7 +20854,7 @@
                                 "Vinicius",
                                 "Estagiário/Projetista"
                             ],
-                            "horas_totais": 5000.0
+                            "horas_totais": 50.0
                         }
                     ]
                 },
@@ -20591,70 +20863,430 @@
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Interferência": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Obras Complementares": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Paisagismo": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Parada de Ônibus": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Passarelas e de Pedestres": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Pavimento": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Sinalização": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Terraplenagem": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 },
                 "Topografia": {
                     "cronograma": {
                         "inicio": "",
                         "fim": ""
                     },
-                    "alocacoes": []
+                    "alocacoes": [
+                        {
+                            "funcionario": [
+                                "",
+                                "Estagiário/Projetista"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Sênior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Pleno"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Eng. Júnior"
+                            ],
+                            "horas_totais": 0.0
+                        },
+                        {
+                            "funcionario": [
+                                "",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 0.0
+                        }
+                    ]
                 }
             },
             "subcontratos": []

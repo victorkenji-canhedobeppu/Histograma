@@ -131,8 +131,8 @@ class Portfolio:
         if num_meses <= 0 or self.horas_trabalhaveis_mes <= 0:
             return None
 
-        decimal_mensal = horas_totais_alocadas / (
-            self.horas_trabalhaveis_mes * num_meses
+        decimal_mensal = round(
+            horas_totais_alocadas / (self.horas_trabalhaveis_mes * num_meses), 2
         )
 
         decimais = {}
@@ -371,7 +371,7 @@ class Portfolio:
 
             if horas_totais_lote > 0:
                 percent_lote = (horas_cargo_alvo_lote / horas_totais_lote) * 100
-                detalhes_por_lote[nome_lote] = percent_lote
+                detalhes_por_lote[nome_lote] = round(percent_lote, 2)
             else:
                 detalhes_por_lote[nome_lote] = 0.0
 
@@ -385,4 +385,4 @@ class Portfolio:
                 horas_cargo_alvo_global / horas_totais_projeto_global
             ) * 100
 
-        return porcentagem_global, detalhes_por_lote
+        return round(porcentagem_global, 2), detalhes_por_lote
