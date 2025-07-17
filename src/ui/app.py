@@ -79,6 +79,28 @@ class App:
 
     # Em app.py, dentro da classe App
 
+    def get_resumo_equipe_por_lote(self):
+        """
+        Retorna um dicionário com o resumo da equipe para cada lote.
+        As chaves do dicionário são os nomes dos lotes e os valores são DataFrames
+        com o resumo de horas por funcionário para aquele lote.
+        """
+        dados_ui = self.ui._coletar_dados_da_ui()
+        if not dados_ui:
+            return {}  # Return empty dictionary if no data
+
+        self.portfolio.definir_dados_lotes(dados_ui["lotes"])
+
+        resumos_por_lote = {}
+        for lote_data in dados_ui["lotes"]:
+            lote_nome = lote_data["nome"]
+            # Generate the report for the specific lot
+            df_resumo_lote = self.portfolio.gerar_relatorio_horas_por_funcionario(
+                nome_lote=lote_nome
+            )
+            resumos_por_lote[lote_nome] = df_resumo_lote
+        return resumos_por_lote
+
     def get_funcionarios_para_tarefa(self, nome_da_tarefa):
         """
         Retorna a lista de funcionários correta para uma tarefa, seguindo uma hierarquia de regras:
@@ -272,3 +294,7 @@ class App:
     def get_todos_os_funcionarios(self):
         """Retorna uma lista com o nome de todos os funcionários cadastrados."""
         return sorted([nome for nome, disciplina in self.funcionarios])
+
+    def get_cargo_estagiario(self):
+        """Returns the specific cargo name for 'ESTAG' from settings."""
+        return CARGOS["ESTAG"]
