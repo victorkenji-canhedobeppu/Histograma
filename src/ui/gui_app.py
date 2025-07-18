@@ -215,6 +215,203 @@ class SelecionarTarefaDialog(simpledialog.Dialog):
         self.resultado = self.combo.get()
 
 
+class PriceManager(tk.Toplevel):
+    def __init__(self, parent, app_controller):
+        super().__init__(parent)
+        self.parent = parent
+        self.transient(parent)
+        self.app_controller = app_controller
+        self.title("Gerenciar Preços por Cargo")
+        self.geometry("400x500")
+        self.resizable(False, False)
+        self.configure(bg="#F0F2F5")
+
+        self.cargo_price_entries = {}
+        # Get initial rates from the controller (using internal keys)
+        # This will be our initial "clean" state
+        self.initial_hourly_rates = self.app_controller.get_all_cargo_hourly_rates()
+        self.current_hourly_rates = self.initial_hourly_rates.copy()  # Work with a copy
+        self.changes_made = False  # Flag to track if any changes occurred
+
+        self.create_widgets()
+        self.populate_entries()
+
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def create_widgets(self):
+        main_frame = ttk.Frame(self, padding=15)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(main_frame, bd=0, highlightthickness=0, bg="#F0F2F5")
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        self.scrollable_content_frame = ttk.Frame(canvas, style="Modern.TFrame")
+
+        self.scrollable_content_frame.bind(
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        # Calculate initial width for the canvas window (inner frame)
+        # We need to ensure scrollbar width is accounted for, and add some padding
+        initial_canvas_width = self.winfo_width() - 30  # Approx. padding + scrollbar
+        if initial_canvas_width < 100:  # Ensure a reasonable minimum
+            initial_canvas_width = 300  # Fallback default
+        canvas.create_window(
+            (0, 0),
+            window=self.scrollable_content_frame,
+            anchor="nw",
+            width=initial_canvas_width,
+        )
+
+        # Bind mousewheel scrolling
+        def _on_canvas_mousewheel(event):
+            canvas.yview_scroll(-1 * (event.delta // 120), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_canvas_mousewheel)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Update the canvas window width when the main_frame (or PriceManager window) changes size
+        # This makes the scrollable content fill the width of the window
+        # We bind to the canvas itself for width updates as its width changes with parent.
+        canvas.bind(
+            "<Configure>",
+            lambda e: canvas.itemconfig(canvas.winfo_children()[0], width=e.width),
+        )
+
+        row_idx = 0
+        for cargo_key, cargo_display_name in CARGOS.items():
+            ttk.Label(
+                self.scrollable_content_frame, text=f"{cargo_display_name}:"
+            ).grid(row=row_idx, column=0, sticky=tk.W, padx=5, pady=(5, 2))
+            entry = ttk.Entry(self.scrollable_content_frame, width=15)
+            entry.grid(row=row_idx, column=1, sticky=tk.EW, padx=5, pady=(5, 2))
+            self.cargo_price_entries[cargo_key] = entry
+
+            # Bind any key or change event to mark changes_made
+            entry.bind("<KeyRelease>", self.mark_changes_made)  # Mark on key release
+            # You could also use <FocusOut> if you want to be more granular about when changes are marked
+            # but KeyRelease catches direct input.
+
+            row_idx += 1
+
+        self.scrollable_content_frame.columnconfigure(1, weight=1)
+
+        # Dedicated Save Button
+        save_btn_frame = ttk.Frame(main_frame)
+        save_btn_frame.pack(fill=tk.X, pady=10)
+        self.save_button = ttk.Button(
+            save_btn_frame,
+            text="Salvar Todos os Preços",
+            command=self.save_all_rates,
+            style="Accent.TButton",
+        )
+        self.save_button.pack(pady=5)
+        self.save_button.config(state="disabled")  # Initially disabled if no changes
+
+    def populate_entries(self):
+        """Populates each entry field with the current hourly rate for its respective cargo."""
+        # This method is called both on init and after saving.
+        # It updates the entries from `self.current_hourly_rates`.
+        for cargo_key, entry_widget in self.cargo_price_entries.items():
+            current_rate = self.current_hourly_rates.get(cargo_key, 0.0)
+            entry_widget.delete(0, tk.END)
+            entry_widget.insert(0, f"{current_rate:.2f}".replace(".", ","))
+
+    def mark_changes_made(self, event=None):
+        """Sets the changes_made flag to True and enables the Save button."""
+        if not self.changes_made:  # Only update if it's currently False
+            self.changes_made = True
+            self.save_button.config(state="normal")
+            # You might also want to change the window title to indicate unsaved changes (e.g., add an asterisk)
+            self.title("Gerenciar Preços por Cargo *")
+
+    def save_all_rates(self):
+        """Collects all rates from the entry fields, updates AppController, and resets flag."""
+        updated_rates_by_key = {}
+        errors = []
+        for cargo_key, entry_widget in self.cargo_price_entries.items():
+            rate_str = entry_widget.get().strip().replace(",", ".")
+            try:
+                rate = float(rate_str)
+                if rate < 0:
+                    raise ValueError("Preço não pode ser negativo.")
+                updated_rates_by_key[cargo_key] = rate
+            except ValueError as e:
+                cargo_display_name = CARGOS.get(cargo_key, cargo_key)
+                errors.append(
+                    f"- {cargo_display_name}: Valor inválido '{rate_str}' ({e})"
+                )
+                # Do not set focus here, as save_all_rates can be called on close
+                # If called from button, it's fine, but on close, we want to prompt.
+
+        if errors:
+            messagebox.showerror(
+                "Erro ao Salvar Preços",
+                "Os seguintes erros foram encontrados:\n" + "\n".join(errors),
+                parent=self,
+            )
+            return False  # Indicate that save failed
+
+        # Check if any rate actually changed compared to the initial state
+        actual_changes = False
+        for key, value in updated_rates_by_key.items():
+            if self.initial_hourly_rates.get(key) != value:
+                actual_changes = True
+                break
+
+        if (
+            not actual_changes and not self.changes_made
+        ):  # No actual changes or flag was never set
+            messagebox.showinfo(
+                "Nenhuma Alteração", "Não há alterações para salvar.", parent=self
+            )
+            self.save_button.config(state="disabled")
+            self.title("Gerenciar Preços por Cargo")
+            return True  # Treat as successful save, nothing to do
+
+        # If there are actual changes and no errors, proceed with saving
+        self.app_controller.set_all_cargo_hourly_rates(updated_rates_by_key)
+        self.current_hourly_rates = (
+            updated_rates_by_key.copy()
+        )  # Update current rates from saved ones
+        self.initial_hourly_rates = (
+            updated_rates_by_key.copy()
+        )  # Reset initial state for next comparison
+        self.populate_entries()  # Refresh entries to show formatted values
+
+        if self.app_controller.ui:
+            self.app_controller.ui.processar_calculo(redirect_to_dashboard=False)
+
+        self.changes_made = False  # Reset flag after successful save
+        self.save_button.config(state="disabled")  # Disable save button
+        self.title("Gerenciar Preços por Cargo")  # Remove asterisk
+        messagebox.showinfo("Sucesso", "Todos os preços foram salvos!", parent=self)
+        return True  # Indicate that save was successful
+
+    def on_closing(self):
+        if self.changes_made:
+            response = messagebox.askyesnocancel(
+                "Salvar Alterações?",
+                "Você tem alterações não salvas. Deseja salvá-las antes de fechar?",
+                parent=self,
+            )
+            if response is True:  # User clicked Yes
+                if (
+                    not self.save_all_rates()
+                ):  # Try to save, if it fails due to errors, don't close
+                    return  # Stay in the window
+            elif response is False:  # User clicked No (discard changes)
+                pass  # Proceed to destroy
+            else:  # User clicked Cancel
+                return  # Don't destroy the window
+
+        # If no changes, or changes saved/discarded, proceed to close
+        if self.parent and self.parent.winfo_exists():
+            self.parent.focus_set()
+        self.destroy()
+
+
 class GuiApp(tk.Tk):
     # ... (init e outros métodos iniciais sem alteração)
     def __init__(self, app_controller):
@@ -874,17 +1071,29 @@ class GuiApp(tk.Tk):
                 entry.icursor(cursor_pos - 1)
 
     def _on_closing(self):
-        # Se o MAC não for autorizado, apenas fecha a janela sem salvar
+        # If MAC is not authorized, just close the window without saving
         if not self.app_controller.mac_autorizado:
             self.destroy()
             return
 
-        # Se for autorizado, salva o estado e fecha
-        # Salva o estado do lote atualmente visível antes de fechar
-        if self.current_lote_name:
-            self._salvar_dados_lote_ui_para_memoria(self.current_lote_name)
+        # If authorized, ask to save the state before closing
+        if messagebox.askyesno(
+            "Salvar Estado da Interface",
+            "Deseja salvar o estado atual da interface antes de sair?",
+            parent=self,
+        ):
+            # Save the state of the currently visible lot before closing
+            if self.current_lote_name:
+                self._salvar_dados_lote_ui_para_memoria(self.current_lote_name)
 
-        self.salvar_estado()
+            self.salvar_estado()
+            messagebox.showinfo(
+                "Salvo", "Estado da interface salvo com sucesso!", parent=self
+            )
+        else:
+            # User chose not to save
+            pass  # Do nothing, just proceed to destroy the window
+
         self.destroy()
 
     def create_control_panel_widgets(self, parent):
@@ -966,13 +1175,124 @@ class GuiApp(tk.Tk):
         )
         self.btn_salvar.grid(row=4, column=0, sticky="ew", ipady=6, pady=2)
 
-        # MODIFIED: Placed "Resetar Tudo" button AFTER "Salvar Dados"
+        self.btn_exportar_json = ttk.Button(
+            action_frame,
+            text="Exportar JSON Atual",
+            command=self._exportar_json_manualmente,  # New command
+            style="TButton",
+        )
+        self.btn_exportar_json.grid(
+            row=5, column=0, sticky="ew", ipady=6, pady=2
+        )  # Moved to row 5
+
+        self.btn_importar_json = ttk.Button(
+            action_frame,
+            text="Carregar JSON",
+            command=self._carregar_json_manualmente,  # New command
+            style="TButton",
+        )
+        self.btn_importar_json.grid(row=6, column=0, sticky="ew", ipady=6, pady=2)
+
+        # MODIFIED: Placed "Resetar Tudo" button AFTER "Salvar Dados" and "Exportar JSON"
         self.btn_resetar = ttk.Button(
             action_frame,
             text="Resetar Tudo",
-            command=self.resetar_interface_completa,  # Now calls the confirmation method
+            command=self.resetar_interface_completa,
         )
-        self.btn_resetar.grid(row=5, column=0, sticky="ew", ipady=4, pady=2)
+        self.btn_resetar.grid(row=7, column=0, sticky="ew", ipady=4, pady=2)
+        price_management_frame = ttk.LabelFrame(
+            parent, text="Preços por Cargo", padding=10
+        )
+        price_management_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
+        price_management_frame.columnconfigure(0, weight=1)
+
+        self.btn_manage_prices = ttk.Button(
+            price_management_frame,
+            text="Gerenciar Preço/Hora",  # Changed text for clarity
+            command=self.open_price_manager,  # New command
+        )
+        self.btn_manage_prices.grid(row=0, column=0, sticky="ew", ipady=4)
+
+    def disable_notebook(self):
+        # Disable all widgets within each tab
+        for tab_id in self.notebook.tabs():
+            tab_widget = self.root.nametowidget(tab_id)  # Get the actual frame widget
+            self._set_widget_state(tab_widget, "disabled")
+
+        # Prevent tab switching visually (optional, might need styling)
+        self.notebook.unbind(
+            "<<NotebookTabChanged>>"
+        )  # Prevent changing tabs with click
+        # You can try to set the tab background to grey, but it's theme-dependent
+        # for i in range(self.notebook.index("end")):
+        #     self.notebook.tab(i, background="lightgrey")
+
+    def enable_notebook(self):
+        # Enable all widgets within each tab
+        for tab_id in self.notebook.tabs():
+            tab_widget = self.root.nametowidget(tab_id)
+            self._set_widget_state(tab_widget, "normal")
+
+        # Re-enable tab switching
+        self.notebook.bind("<<NotebookTabChanged>>", lambda event: None)
+
+    def _exportar_json_manualmente(self):
+        """
+        Exports the current application state (collected from UI) to a JSON file
+        chosen by the user.
+        """
+        try:
+            # First, ensure the currently visible lot's UI data is saved to memory.
+            if self.current_lote_name:
+                self._salvar_dados_lote_ui_para_memoria(self.current_lote_name)
+
+            # Collect all data from the UI and in-memory structures
+            dados_para_exportar = self._coletar_dados_da_ui()
+
+            if not dados_para_exportar:
+                messagebox.showwarning(
+                    "Aviso", "Nenhum dado para exportar.", parent=self
+                )
+                return
+
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("Arquivos JSON", "*.json"), ("Todos os Arquivos", "*.*")],
+                title="Salvar Estado da Interface como JSON",
+                initialfile=f"estado_app_{datetimeFootHolder.now().strftime('%Y-%m-%d_%H-%M-%S')}.json",
+            )
+
+            if not filepath:
+                return  # User cancelled the dialog
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(dados_para_exportar, f, ensure_ascii=False, indent=4)
+
+            messagebox.showinfo(
+                "Sucesso",
+                f"Dados da interface exportados com sucesso para:\n{filepath}",
+                parent=self,
+            )
+
+        except Exception as e:
+            traceback.print_exc()  # Print full traceback for debugging
+            messagebox.showerror(
+                "Erro na Exportação",
+                f"Ocorreu um erro ao exportar o arquivo JSON: {e}",
+                parent=self,
+            )
+
+    def open_price_manager(self):
+        if (
+            hasattr(self, "_price_manager_window")
+            and self._price_manager_window
+            and self._price_manager_window.winfo_exists()
+        ):
+            self._price_manager_window.focus()
+        else:
+            self._price_manager_window = PriceManager(
+                self, self.app_controller
+            )  # Pass app_controller
 
     def _salvar_dados_manualmente(self):
         """
@@ -994,16 +1314,17 @@ class GuiApp(tk.Tk):
                 parent=self,
             )
 
-    def resetar_interface_completa(self):
+    def resetar_interface_completa(self, confirm=True):
         """
         Asks for confirmation and, if positive, resets the entire application to its initial state.
         """
-        if not messagebox.askyesno(
-            "Confirmar Reset",
-            "Are you sure you want to delete ALL data and restart the interface?\n\nThis action cannot be undone.",
-            parent=self,
-        ):
-            return
+        if confirm:
+            if not messagebox.askyesno(
+                "Confirmar Reset",
+                "Are you sure you want to delete ALL data and restart the interface?\n\nThis action cannot be undone.",
+                parent=self,
+            ):
+                return
 
         print("INFO: Initiating complete application reset.")
 
@@ -1055,11 +1376,12 @@ class GuiApp(tk.Tk):
         # So, no need to explicitly clear current_lote_dash_tree here, as it will be cleared by the next render.
         # self.current_lote_dash_tree.delete(*self.current_lote_dash_tree.get_children())
 
-        messagebox.showinfo(
-            "Reset Concluded",
-            "The application has been reset to its initial state.",
-            parent=self,
-        )
+        if confirm:  # Only show this message if confirmation was explicitly asked for.
+            messagebox.showinfo(
+                "Reset Concluded",
+                "The application has been reset to its initial state.",
+                parent=self,
+            )
 
     def set_modo_restringido(self, restringido):
         """Habilita ou desabilita as funcionalidades principais da aplicação."""
@@ -1080,6 +1402,15 @@ class GuiApp(tk.Tk):
             self.btn_calcular.config(state=novo_estado)
             self.btn_exportar_cronograma.config(state=novo_estado)
             self.btn_exportar_quantidades.config(state=novo_estado)
+            self.btn_salvar.config(state=novo_estado)  # Enable/disable save button
+            self.btn_exportar_json.config(
+                state=novo_estado
+            )  # Enable/disable export JSON
+            self.btn_importar_json.config(state="disabled")
+            self.btn_resetar.config(state=novo_estado)  # Enable/disable reset button
+            self.btn_manage_prices.config(
+                state=novo_estado
+            )  # Enable/disable price manager
 
     # NOVO: Função para exportar o resumo da equipe.
     def exportar_resumo_equipe(self):
@@ -1165,7 +1496,6 @@ class GuiApp(tk.Tk):
         ws.sheet_view.showGridLines = False
 
         # --- ESTILOS PADRONIZADOS ---
-        # (styles definitions remain the same)
         header_font = Font(name="Arial", bold=True, color="000000", size=11)
         header_fill = PatternFill(
             start_color="E68A00", end_color="E68A00", fill_type="solid"
@@ -1182,6 +1512,10 @@ class GuiApp(tk.Tk):
         horas_fill = PatternFill(
             start_color="FFFFE0", end_color="FFFFE0", fill_type="solid"
         )  # Amarelo claro
+        sub_category_font = Font(name="Arial", bold=True, size=11, color="5A5A5A")
+        sub_category_fill = PatternFill(
+            start_color="F0F0F0", end_color="F0F0F0", fill_type="solid"
+        )
 
         # --- 1. TABELA DE PREÇOS ---
         ws.cell(row=2, column=2, value="Tabela de Preços por Cargo").font = Font(
@@ -1196,28 +1530,39 @@ class GuiApp(tk.Tk):
         cell_preco_header.border = full_border
 
         start_row_price_table = 4
-        for i, cargo_nome in enumerate(cargos, start=start_row_price_table):
-            ws.cell(row=i, column=2, value=cargo_nome).font = data_font
+        # Get the internal hourly rates (by key)
+        internal_hourly_rates = (
+            self.app_controller._hourly_rates_by_cargo
+        )  # Access directly
+
+        # Iterate through the CARGOS dictionary to get both key and full name
+        # to display the full name but retrieve the price by key
+        for i, (cargo_key, cargo_name_display) in enumerate(
+            CARGOS.items(), start=start_row_price_table
+        ):
+            ws.cell(row=i, column=2, value=cargo_name_display).font = (
+                data_font  # Display full name
+            )
             price_cell = ws.cell(row=i, column=3)
+            # Retrieve the rate using the cargo_key
+            price_cell.value = internal_hourly_rates.get(cargo_key, 0.0)
             price_cell.style = "input_style_resumo"
 
-        end_row_price_table = start_row_price_table + len(cargos) - 1
+        end_row_price_table = (
+            start_row_price_table + len(CARGOS) - 1
+        )  # Use CARGOS for full list
 
-        # MODIFICATION START: Make named range name unique per sheet
-        unique_price_table_name = f"TabelaPrecos_{sheet_name.replace(' ', '_')}"  # e.g., "TabelaPrecos_Lote_1"
+        unique_price_table_name = f"TabelaPrecos_{sheet_name.replace(' ', '_')}"
         price_table_range_str = f"'{sheet_name}'!${openpyxl.utils.get_column_letter(2)}${start_row_price_table}:${openpyxl.utils.get_column_letter(3)}${end_row_price_table}"
 
-        # Get the sheet index for local scope
         sheet_index = book.sheetnames.index(sheet_name)
 
         named_range_obj = openpyxl.workbook.defined_name.DefinedName(
-            unique_price_table_name,  # Use the unique name
+            unique_price_table_name,
             localSheetId=sheet_index,
             attr_text=price_table_range_str,
         )
         book.defined_names[named_range_obj.name] = named_range_obj
-
-        # MODIFICATION END
 
         # --- 2. TABELA PRINCIPAL DE DADOS ---
         df["Cargo"] = pd.Categorical(df["Cargo"], categories=cargos, ordered=True)
@@ -1269,16 +1614,14 @@ class GuiApp(tk.Tk):
             horas_cell_coord = (
                 f"{openpyxl.utils.get_column_letter(4)}{current_row_excel}"
             )
-            # MODIFICATION START: Use the unique named range in the formula
             formula = f'=IFERROR(VLOOKUP({cargo_cell_coord},{unique_price_table_name},2,FALSE)*{horas_cell_coord},"-")'
-            # MODIFICATION END
 
             valor_cell = ws.cell(row=current_row_excel, column=5, value=formula)
             valor_cell.number_format = '"R$" #,##0.00'
             current_row_excel += 1
         end_row_main_table = current_row_excel - 1
 
-        # --- 3. SEÇÃO DE TOTAIS E RESUMO FINANCEIRO ---
+        # --- 3. SEÇÃO DE TOTAIS E RESUMO FINANCEIRO POR DISCIPLINA ---
         total_geral_row = end_row_main_table + 1
         valor_col_letter = openpyxl.utils.get_column_letter(5)
         total_geral_label_cell = ws.cell(
@@ -1290,7 +1633,7 @@ class GuiApp(tk.Tk):
         total_geral_valor_cell = ws.cell(
             row=total_geral_row,
             column=5,
-            value=f"=SUM({valor_col_letter}${start_row_main_table+1}:${valor_col_letter}{end_row_main_table})",
+            value=f"=SUM({valor_col_letter}${start_row_main_table+1}:{valor_col_letter}{end_row_main_table})",
         )
         total_geral_valor_cell.font = Font(name="Arial", bold=True, size=11)
         total_geral_valor_cell.number_format = '"R$" #,##0.00'
@@ -1334,7 +1677,6 @@ class GuiApp(tk.Tk):
             )
             subtotal_cell.number_format = '"R$" #,##0.00'
 
-        # --- CORREÇÃO DA POSIÇÃO DO TOTAL FINAL ---
         last_data_row_summary = start_row_summary_data + len(disciplinas_unicas) - 1
         total_final_row = last_data_row_summary + 1
 
@@ -1343,7 +1685,6 @@ class GuiApp(tk.Tk):
         total_final_label.alignment = Alignment(horizontal="right")
 
         subtotal_col_letter = openpyxl.utils.get_column_letter(5)
-        # CORREÇÃO DA FÓRMULA DE SOMA
         formula_total_final = f"=SUM({subtotal_col_letter}{start_row_summary_data}:{subtotal_col_letter}{last_data_row_summary})"
         total_final_valor = ws.cell(
             row=total_final_row, column=5, value=formula_total_final
@@ -1351,14 +1692,368 @@ class GuiApp(tk.Tk):
         total_final_valor.font = Font(name="Arial", bold=True, size=12)
         total_final_valor.number_format = '"R$" #,##0.00'
 
-        # --- 4. FORMATAÇÃO FINAL ---
+        # --- 4. NOVA SEÇÃO: RESUMO POR CARGO ---
+        start_row_cargo_summary = total_final_row + 3
+        ws.cell(
+            row=start_row_cargo_summary, column=2, value="Resumo por Cargo"
+        ).font = Font(bold=True, size=14)
+
+        cargo_summary_headers = ["Cargo", "Horas Totais", "Valor Total (R$)"]
+        for c_idx, text in enumerate(cargo_summary_headers, 2):
+            cell = ws.cell(row=start_row_cargo_summary + 1, column=c_idx, value=text)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        # Calculate total hours per cargo from df_sorted
+        df_cargo_totals = (
+            df_sorted.groupby("Cargo")["Horas Totais Alocadas"].sum().reset_index()
+        )
+        df_cargo_totals.columns = ["Cargo", "Horas Totais"]
+
+        # Ensure all CARGOS are present in the summary, even if they have 0 hours
+        # This will ensure the VLOOKUP works for all defined cargos
+        all_cargos_df = pd.DataFrame(CARGOS.values(), columns=["Cargo"])
+        df_cargo_totals_full = pd.merge(
+            all_cargos_df, df_cargo_totals, on="Cargo", how="left"
+        ).fillna(0)
+        df_cargo_totals_full["Horas Totais"] = df_cargo_totals_full[
+            "Horas Totais"
+        ].astype(float)
+        df_cargo_totals_full = df_cargo_totals_full.sort_values(
+            by="Cargo",
+            key=lambda x: pd.Categorical(
+                x, categories=[CARGOS[k] for k in CARGOS], ordered=True
+            ),
+        )
+
+        current_cargo_summary_row = start_row_cargo_summary + 2
+        first_cargo_data_row = (
+            current_cargo_summary_row  # Keep track of the first data row for SUM
+        )
+
+        for _, row_data in df_cargo_totals_full.iterrows():
+            cargo_display_name = row_data["Cargo"]
+            total_horas = row_data["Horas Totais"]
+
+            ws.cell(
+                row=current_cargo_summary_row, column=2, value=cargo_display_name
+            ).font = data_font
+            horas_cell = ws.cell(
+                row=current_cargo_summary_row, column=3, value=total_horas
+            )
+            horas_cell.number_format = "0"
+            horas_cell.fill = horas_fill  # Apply the light yellow fill
+
+            # Find the internal cargo key for the VLOOKUP
+            # Inverse lookup from display name to key
+            cargo_key_for_lookup = next(
+                (key for key, val in CARGOS.items() if val == cargo_display_name),
+                cargo_display_name,
+            )
+
+            # Formula: Total Hours * Price from the Price Table
+            # Note: We need to use the actual displayed cargo name in the VLOOKUP for simplicity,
+            # or ensure the price table also uses the display names.
+            # Given price table setup, it's simpler if the VLOOKUP matches on displayed names.
+            cargo_cell_in_summary_coord = ws.cell(
+                row=current_cargo_summary_row, column=2
+            ).coordinate
+            formula_cargo_value = f"=IFERROR(VLOOKUP({cargo_cell_in_summary_coord},{unique_price_table_name},2,FALSE)*{horas_cell.coordinate},0)"  # Changed to 0 if error
+
+            value_cell = ws.cell(
+                row=current_cargo_summary_row, column=4, value=formula_cargo_value
+            )
+            value_cell.number_format = '"R$" #,##0.00'
+
+            current_cargo_summary_row += 1
+
+        last_cargo_data_row = current_cargo_summary_row - 1  # Last row with data
+
+        # Add Totals for Resumo por Cargo
+        total_cargo_summary_row = current_cargo_summary_row
+        ws.cell(row=total_cargo_summary_row, column=2, value="Total").font = Font(
+            bold=True
+        )
+        ws.cell(row=total_cargo_summary_row, column=2).alignment = Alignment(
+            horizontal="right"
+        )
+
+        # Sum of Horas Totais
+        horas_total_cargo_formula = f"=SUM({openpyxl.utils.get_column_letter(3)}{first_cargo_data_row}:{openpyxl.utils.get_column_letter(3)}{last_cargo_data_row})"
+        horas_total_cargo_cell = ws.cell(
+            row=total_cargo_summary_row, column=3, value=horas_total_cargo_formula
+        )
+        horas_total_cargo_cell.number_format = "0"
+        horas_total_cargo_cell.font = Font(bold=True)
+
+        # Sum of Valor Total (R$)
+        valor_total_cargo_formula = f"=SUM({openpyxl.utils.get_column_letter(4)}{first_cargo_data_row}:{openpyxl.utils.get_column_letter(4)}{last_cargo_data_row})"
+        valor_total_cargo_cell = ws.cell(
+            row=total_cargo_summary_row, column=4, value=valor_total_cargo_formula
+        )
+        valor_total_cargo_cell.number_format = '"R$" #,##0.00'
+        valor_total_cargo_cell.font = Font(bold=True)
+
+        # Update total_final_row based on the new end of cargo summary
+        total_final_row = total_cargo_summary_row  # Last row populated by this section
+
+        # --- 5. NOVA SEÇÃO: RESUMO POR DISCIPLINA (Horas e Valor) ---
+        start_row_disciplina_summary = total_final_row + 3
+        ws.cell(
+            row=start_row_disciplina_summary, column=2, value="Resumo por Disciplina"
+        ).font = Font(bold=True, size=14)
+
+        # Headers for the detailed discipline summary
+        disciplina_detail_headers = ["Cargo", "H. Total", "Valor Total (R$)"]
+        for c_idx, text in enumerate(disciplina_detail_headers, 2):
+            cell = ws.cell(
+                row=start_row_disciplina_summary + 1, column=c_idx, value=text
+            )
+            cell.font = header_font
+            cell.fill = header_fill
+
+        current_disciplina_summary_row = start_row_disciplina_summary + 2
+        first_discipline_subtotal_row = (
+            None  # To keep track of first subtotal row for final sum
+        )
+
+        # Get unique disciplines and sort them
+        disciplinas_in_data = sorted(df_sorted["Disciplina"].unique())
+
+        for disciplina_name in disciplinas_in_data:
+            # Write the discipline name as a category header
+            disciplina_header_cell = ws.cell(
+                row=current_disciplina_summary_row, column=2, value=disciplina_name
+            )
+            disciplina_header_cell.font = category_font
+            disciplina_header_cell.fill = category_fill
+            ws.merge_cells(
+                start_row=current_disciplina_summary_row,
+                start_column=2,
+                end_row=current_disciplina_summary_row,
+                end_column=len(disciplina_detail_headers)
+                + 1,  # Merge across the detail columns
+            )
+            current_disciplina_summary_row += 1
+
+            # Filter data for the current discipline
+            df_disciplina_filtered = df_sorted[
+                df_sorted["Disciplina"] == disciplina_name
+            ]
+
+            # Calculate total hours per cargo within this discipline
+            df_cargo_disciplina_totals = (
+                df_disciplina_filtered.groupby("Cargo")["Horas Totais Alocadas"]
+                .sum()
+                .reset_index()
+            )
+            df_cargo_disciplina_totals.columns = ["Cargo", "Horas Totais"]
+
+            # Ensure all CARGOS are present for this discipline sub-summary (if they exist)
+            # We need to consider all possible cargos for display, even if they have 0 hours for this specific discipline.
+            all_cargos_df = pd.DataFrame(CARGOS.values(), columns=["Cargo"])
+            df_cargo_disciplina_totals_full = pd.merge(
+                all_cargos_df, df_cargo_disciplina_totals, on="Cargo", how="left"
+            ).fillna(0)
+            df_cargo_disciplina_totals_full["Horas Totais"] = (
+                df_cargo_disciplina_totals_full["Horas Totais"].astype(float)
+            )
+            df_cargo_disciplina_totals_full = (
+                df_cargo_disciplina_totals_full.sort_values(
+                    by="Cargo",
+                    key=lambda x: pd.Categorical(
+                        x, categories=[CARGOS[k] for k in CARGOS], ordered=True
+                    ),
+                )
+            )
+
+            for _, row_data in df_cargo_disciplina_totals_full.iterrows():
+                cargo_display_name = row_data["Cargo"]
+                total_horas = row_data["Horas Totais"]
+
+                # Write Cargo name
+                ws.cell(
+                    row=current_disciplina_summary_row,
+                    column=2,
+                    value=cargo_display_name,
+                ).font = data_font
+
+                # Write Horas Totais
+                horas_cell = ws.cell(
+                    row=current_disciplina_summary_row, column=3, value=total_horas
+                )
+                horas_cell.number_format = "0"
+                horas_cell.fill = horas_fill
+
+                # Calculate Valor Total (R$) using VLOOKUP
+                cargo_cell_in_summary_coord = ws.cell(
+                    row=current_disciplina_summary_row, column=2
+                ).coordinate
+                horas_cell_coord_for_formula = ws.cell(
+                    row=current_disciplina_summary_row, column=3
+                ).coordinate
+
+                # Formula for Valor Total ($)
+                formula_cargo_value = f"=IFERROR(VLOOKUP({cargo_cell_in_summary_coord},{unique_price_table_name},2,FALSE)*{horas_cell_coord_for_formula},0)"
+
+                value_cell = ws.cell(
+                    row=current_disciplina_summary_row,
+                    column=4,
+                    value=formula_cargo_value,
+                )
+                value_cell.number_format = '"R$" #,##0.00'
+
+                current_disciplina_summary_row += 1
+
+            # Add a subtotal for the discipline (only for the '$' column)
+            # Find the range of $ values for this specific discipline's cargos
+            # The range starts right after the discipline header and ends before the next discipline header (or end of list)
+            if (
+                first_discipline_subtotal_row is None
+            ):  # Set the first data row for the discipline summary
+                first_discipline_subtotal_row = (
+                    start_row_disciplina_summary + 2
+                )  # Header + 1 row for title + 1 for actual data (adjust if needed)
+
+            # The subtotal for the current discipline needs to sum from the row after the discipline header
+            # up to the current row (which is the last row of cargo data + 1)
+            subtotal_start_row_for_discipline = current_disciplina_summary_row - len(
+                df_cargo_disciplina_totals_full
+            )
+            subtotal_end_row_for_discipline = current_disciplina_summary_row - 1
+
+            if (
+                subtotal_end_row_for_discipline >= subtotal_start_row_for_discipline
+            ):  # Only add if there are actual cargo entries
+                ws.cell(
+                    row=current_disciplina_summary_row,
+                    column=3,
+                    value="Total",
+                ).font = Font(bold=True)
+                ws.cell(row=current_disciplina_summary_row, column=3).alignment = (
+                    Alignment(horizontal="right")
+                )
+
+                # Sum of '$' for the current discipline
+                valor_total_disciplina_formula = f"=SUM({openpyxl.utils.get_column_letter(4)}{subtotal_start_row_for_discipline}:{openpyxl.utils.get_column_letter(4)}{subtotal_end_row_for_discipline})"
+                valor_total_disciplina_cell = ws.cell(
+                    row=current_disciplina_summary_row,
+                    column=4,
+                    value=valor_total_disciplina_formula,
+                )
+                valor_total_disciplina_cell.number_format = '"R$" #,##0.00'
+                valor_total_disciplina_cell.font = Font(bold=True)
+                current_disciplina_summary_row += 1
+                ws.row_dimensions[current_disciplina_summary_row - 1].height = (
+                    18  # Add a little space after subtotal
+                )
+
+        # Update total_final_row based on the new end of discipline summary
+        total_final_row = (
+            current_disciplina_summary_row - 1
+        )  # The very last row populated (might be a blank row)
+
+        # --- 6. FORMATAÇÃO FINAL --- (Adjusted to reflect new structure)
+        # Apply borders and fonts to all cells with content (including new section)
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
             for cell in row:
-                if cell.value is not None or cell.style == "input_style_resumo":
+                if cell.value is not None or (
+                    hasattr(cell, "style") and cell.style == "input_style_resumo"
+                ):
                     cell.border = full_border
+                    # Do not override bold fonts of headers or category headers if they are already bold
+                    if not cell.font.bold:
+                        cell.font = data_font
 
-        for i in range(1, len(headers) + 2):
-            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 25
+        # Adjust column widths
+        # Re-iterate over relevant columns to ensure new table also gets proper width
+        all_cols_to_adjust = max(
+            len(headers), len(cargo_summary_headers), len(disciplina_detail_headers)
+        )
+        for i in range(1, all_cols_to_adjust + 1):
+            column_letter = openpyxl.utils.get_column_letter(i)
+            max_len_in_col = 0
+            for r_idx in range(1, ws.max_row + 1):
+                cell_value = ws.cell(row=r_idx, column=i).value
+                if cell_value is not None:
+                    max_len_in_col = max(max_len_in_col, len(str(cell_value)))
+
+            # Add some padding and ensure a minimum width
+            ws.column_dimensions[column_letter].width = max(max_len_in_col + 4, 15)
+
+    def _carregar_json_manualmente(self):
+        """
+        Loads application state from a user-selected JSON file.
+        """
+        if not self.app_controller.mac_autorizado:
+            messagebox.showwarning(
+                "Licença Inválida",
+                "A funcionalidade de carregamento de JSON está desabilitada nesta máquina.",
+                parent=self,
+            )
+            return
+
+        # Confirm with the user before loading, as it will overwrite current state
+        if not messagebox.askyesno(
+            "Confirmar Carregamento",
+            "Carregar um arquivo JSON substituirá todos os dados atuais na interface. Deseja continuar?",
+            parent=self,
+        ):
+            return
+
+        filepath = filedialog.askopenfilename(
+            defaultextension=".json",
+            filetypes=[("Arquivos JSON", "*.json"), ("Todos os Arquivos", "*.*")],
+            title="Carregar Estado da Interface de um JSON",
+        )
+
+        if not filepath:
+            return  # User cancelled the dialog
+
+        self._is_loading = (
+            True  # Set loading flag to prevent unwanted re-calculations/state saves
+        )
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                loaded_state = json.load(f)
+
+            # Clear current UI and internal data structures before loading new state
+            self.resetar_interface_completa(
+                confirm=False
+            )  # Reset without asking for confirmation again
+
+            # Now, populate the UI with the loaded state
+            self._renderizar_estado_na_ui(loaded_state)
+
+            # Update employees in the AppController
+            self.app_controller.funcionarios.clear()  # Clear existing
+            for func_data in loaded_state.get("funcionarios", []):
+                self.app_controller.adicionar_funcionario(*func_data)
+            self.atualizar_lista_funcionarios()  # Refresh Team Manager if open
+
+            messagebox.showinfo(
+                "Sucesso",
+                f"Estado da interface carregado com sucesso de:\n{filepath}",
+                parent=self,
+            )
+            # Trigger a full calculation after loading
+            self.processar_calculo(redirect_to_dashboard=True)
+
+        except json.JSONDecodeError as e:
+            messagebox.showerror(
+                "Erro de Leitura de JSON",
+                f"O arquivo selecionado não é um JSON válido ou está corrompido: {e}",
+                parent=self,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            messagebox.showerror(
+                "Erro ao Carregar",
+                f"Ocorreu um erro inesperado ao carregar o arquivo: {e}",
+                parent=self,
+            )
+        finally:
+            self._is_loading = False  # Reset loading flag
 
     def open_team_manager(self):
         if self.team_window and self.team_window.winfo_exists():
@@ -2475,9 +3170,10 @@ class GuiApp(tk.Tk):
     def gerar_abas_lotes(self, popular_defaults=True):
         """
         This function now updates the list of lots in the combobox and
-        recreates the UI for the initially selected lot.
+        recreates the UI for the initially selected lot. It intelligently
+        adds new lots or removes excess ones without resetting all data.
         """
-        # Save the state of the current visible lot before generating new lots
+        # Save the state of the current visible lot before making changes
         if self.current_lote_name:
             self._salvar_dados_lote_ui_para_memoria(self.current_lote_name)
 
@@ -2489,36 +3185,39 @@ class GuiApp(tk.Tk):
             messagebox.showerror("Erro", "Insira um número válido e positivo de lotes.")
             return
 
-        # Clear the lot data in memory and the selection combobox
-        self.lote_widgets.clear()
-        self.lote_selection_combo.set("")
-        self.lote_selection_combo.config(values=[])
+        # Get existing lot names and sort them numerically
+        existing_lote_names = sorted(
+            list(self.lote_widgets.keys()), key=self._numerical_sort_key
+        )
+        new_lote_names = [str(i + 1) for i in range(num_lotes)]
 
-        # Clear the inner notebook tabs and destroy existing widgets within the content frames
-        for tab in self.lote_inner_notebook.tabs():
-            self.lote_inner_notebook.forget(tab)
-        for widget in self.current_lote_content_frame.winfo_children():
-            widget.destroy()
-        self.current_lote_dash_tree.delete(*self.current_lote_dash_tree.get_children())
+        # Determine lots to add and lots to remove
+        lots_to_add = [
+            name for name in new_lote_names if name not in existing_lote_names
+        ]
+        lots_to_remove = [
+            name for name in existing_lote_names if name not in new_lote_names
+        ]
 
-        self.current_lote_name = None
+        # 1. Remove excess lots
+        for lote_name in lots_to_remove:
+            if lote_name in self.lote_widgets:
+                # Remove from internal data structure
+                del self.lote_widgets[lote_name]
+                print(f"INFO: Removed excess lot: {lote_name}")
 
-        lote_names = []
-        for i in range(num_lotes):
-            lote_nome = str(i + 1)
-            lote_names.append(lote_nome)
-
+        # 2. Add new empty lots
+        for lote_name in lots_to_add:
             # Initialize the data structure for the new lot (data only)
-            self.lote_widgets[lote_nome] = {
-                "nome": lote_nome,
+            self.lote_widgets[lote_name] = {
+                "nome": lote_name,
                 "disciplinas": {},  # Will be filled below or on load
             }
-
             if popular_defaults:
                 disciplinas_iniciais = self.app_controller.get_disciplinas()
                 for disc in disciplinas_iniciais:
                     # Add discipline to the lot's data dictionary
-                    self.lote_widgets[lote_nome]["disciplinas"][disc] = {
+                    self.lote_widgets[lote_name]["disciplinas"][disc] = {
                         "cronograma": {
                             "inicio": "",
                             "fim": "",
@@ -2528,30 +3227,51 @@ class GuiApp(tk.Tk):
                     # Populate with default allocations (data, not UI widgets)
                     cargos_disponiveis = self.app_controller.get_cargos_disponiveis()
                     for cargo_padrao in cargos_disponiveis:
-                        self.lote_widgets[lote_nome]["disciplinas"][disc][
+                        self.lote_widgets[lote_name]["disciplinas"][disc][
                             "alocacoes"
                         ].append(
                             {
-                                "funcionario": [
-                                    "",
-                                    cargo_padrao,
-                                ],
+                                "funcionario": ["", cargo_padrao],
                                 "horas_totais": 0.0,
                             }
                         )
+            print(f"INFO: Added new empty lot: {lote_name}")
 
-        # Update the combobox with lot names
-        self.lote_selection_combo.config(
-            values=sorted(lote_names, key=self._numerical_sort_key)
+        # Update the combobox with all current lot names (sorted)
+        all_current_lote_names = sorted(
+            list(self.lote_widgets.keys()), key=self._numerical_sort_key
         )
-        if lote_names:
-            first_lote = sorted(lote_names)[0]
-            self.lote_selection_combo.set(first_lote)
-            self.current_lote_name = first_lote
-            # Render the UI for the first lot after generating
-            self._renderizar_lote_na_ui(first_lote)
+        self.lote_selection_combo.config(values=all_current_lote_names)
 
+        # Set the current_lote_name and render the UI for the first lot if any exist
+        if all_current_lote_names:
+            first_lote = all_current_lote_names[0]
+            # Only change selection if it's different or if no lot was previously selected
+            if self.current_lote_name != first_lote or self.current_lote_name is None:
+                self.lote_selection_combo.set(first_lote)
+                self.current_lote_name = first_lote
+                self._renderizar_lote_na_ui(first_lote)
+        else:
+            # If no lots remain, clear everything related to lot display
+            self.lote_selection_combo.set("")
+            self.current_lote_name = None
+            for tab in self.lote_inner_notebook.tabs():
+                self.lote_inner_notebook.forget(tab)
+            for widget in self.current_lote_content_frame.winfo_children():
+                widget.destroy()
+            self.current_lote_dash_tree.delete(
+                *self.current_lote_dash_tree.get_children()
+            )
+
+        # Ensure employee list is updated (might be affected by lot changes)
         self.atualizar_lista_funcionarios()
+
+        # Recalculate to update dashboards based on the new lot structure
+        self.processar_calculo(redirect_to_dashboard=False)
+
+        messagebox.showinfo(
+            "Lotes Atualizados", "O número de lotes foi ajustado com sucesso!"
+        )
 
     def _popular_lotes_com_defaults(self):
         """

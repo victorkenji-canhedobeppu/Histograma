@@ -5,8 +5,8 @@
             "disciplinas": {
                 "Coordenação": {
                     "cronograma": {
-                        "inicio": "",
-                        "fim": ""
+                        "inicio": "01/02/2024",
+                        "fim": "01/03/2024"
                     },
                     "alocacoes": []
                 },
@@ -68,21 +68,21 @@
                         {
                             "funcionario": [
                                 "André",
+                                "Coordenador"
+                            ],
+                            "horas_totais": 25.0
+                        },
+                        {
+                            "funcionario": [
+                                "Caio",
                                 "Eng. Sênior"
                             ],
                             "horas_totais": 50.0
                         },
                         {
                             "funcionario": [
-                                "Caio",
-                                "Eng. Pleno"
-                            ],
-                            "horas_totais": 50.0
-                        },
-                        {
-                            "funcionario": [
                                 "Daphne",
-                                "Estagiário/Projetista"
+                                "Coordenador"
                             ],
                             "horas_totais": 50.0
                         },
@@ -96,7 +96,7 @@
                         {
                             "funcionario": [
                                 "Fujii",
-                                "Eng. Sênior"
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 50.0
                         },
@@ -110,21 +110,21 @@
                         {
                             "funcionario": [
                                 "Gabriela T.",
-                                "Estagiário/Projetista"
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 50.0
                         },
                         {
                             "funcionario": [
                                 "Gustvao C.",
-                                "Estagiário/Projetista"
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 50.0
                         },
                         {
                             "funcionario": [
                                 "Humberto",
-                                "Coordenador"
+                                "Estagiário/Projetista"
                             ],
                             "horas_totais": 50.0
                         },
@@ -138,7 +138,7 @@
                         {
                             "funcionario": [
                                 "Karen",
-                                "Eng. Sênior"
+                                "Estagiário/Projetista"
                             ],
                             "horas_totais": 50.0
                         },
@@ -152,7 +152,7 @@
                         {
                             "funcionario": [
                                 "Lucas Bispo",
-                                "Estagiário/Projetista"
+                                "Eng. Pleno"
                             ],
                             "horas_totais": 50.0
                         },
@@ -21290,11 +21290,150 @@
                 }
             },
             "subcontratos": []
+        },
+        {
+            "nome": "26",
+            "disciplinas": {
+                "Coordenação": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Desapropriação": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Drenagem": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estruturas": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estudo de Alternativa": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estudos Geológicos-Geotécnicos": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Estudos Hidrológicos": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geologia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geometria": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Geotecnia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Interferência": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Obras Complementares": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Paisagismo": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Parada de Ônibus": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Passarelas e de Pedestres": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Pavimento": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Sinalização": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Terraplenagem": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                },
+                "Topografia": {
+                    "cronograma": {
+                        "inicio": "",
+                        "fim": ""
+                    },
+                    "alocacoes": []
+                }
+            },
+            "subcontratos": []
         }
     ],
     "config": {
         "horas_mes": 160,
-        "num_lotes": 25
+        "num_lotes": 26
     },
     "funcionarios": [
         [

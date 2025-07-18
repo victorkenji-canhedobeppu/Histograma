@@ -39,6 +39,9 @@ class App:
             )
         else:
             print("INFO: Licença validada com sucesso.")
+
+        self._hourly_rates_by_cargo = {key: 0.0 for key in CARGOS.keys()}
+        self._cargo_name_to_key = {name: key for key, name in CARGOS.items()}
         self.funcionarios = []
         self.portfolio = Portfolio(list(DISCIPLINAS.values()))
         self.ui = GuiApp(app_controller=self)
@@ -298,3 +301,45 @@ class App:
     def get_cargo_estagiario(self):
         """Returns the specific cargo name for 'ESTAG' from settings."""
         return CARGOS["ESTAG"]
+
+    def get_all_cargo_hourly_rates(self):
+        """Returns a copy of the internal hourly rates dictionary (key: rate)."""
+        # Ensure all CARGOS from settings have an entry, default to 0.0
+        self.initialize_hourly_rates_if_empty()
+        return self._hourly_rates_by_cargo.copy()
+
+    def update_cargo_hourly_rate(self, full_cargo_name, new_rate):
+        """Updates a cargo's hourly rate using its *full descriptive name*."""
+        cargo_key = self._cargo_name_to_key.get(full_cargo_name)
+        if cargo_key:
+            self._hourly_rates_by_cargo[cargo_key] = new_rate
+            print(
+                f"DEBUG: Updated rate for {full_cargo_name} ({cargo_key}) to R$ {new_rate:.2f}"
+            )
+        else:
+            print(
+                f"WARNING: Attempted to update rate for unknown cargo (full name): {full_cargo_name}"
+            )
+
+    def set_all_cargo_hourly_rates(self, rates_dict_by_key):
+        """
+        Sets all hourly rates from a loaded dictionary (expected keys are short_keys).
+        This is typically used during loading from file.
+        """
+        for key in CARGOS.keys():
+            if key in rates_dict_by_key:
+                self._hourly_rates_by_cargo[key] = rates_dict_by_key[key]
+            else:  # If a cargo was in CARGOS but not in loaded data, initialize to 0.0
+                self._hourly_rates_by_cargo[key] = 0.0
+        print(f"DEBUG: Hourly rates loaded/set: {self._hourly_rates_by_cargo}")
+
+    def initialize_hourly_rates_if_empty(self):
+        """Ensures all CARGOS have an entry in _hourly_rates_by_cargo (by key),
+        initializing with 0.0 if missing."""
+        for key in CARGOS.keys():
+            if key not in self._hourly_rates_by_cargo:
+                self._hourly_rates_by_cargo[key] = 0.0
+
+    def get_cargos_disponiveis(self):
+        """Returns a list of *full descriptive names* for display."""
+        return list(CARGOS.values())

@@ -26,6 +26,10 @@ CARGOS = {
     "ENG_PL": "Eng. Pleno",
     "ENG_SR": "Eng. Sênior",
     "COORD": "Coordenador",
+    "DES": "Desenhista",
+    "COORD_EQP": "Coordenador de Equipe",
+    "ENG_CONS": "Eng. Consultor",
+    "BIM_MAN": "BIM Manager",
 }
 
 SUBCONTRATOS = {
